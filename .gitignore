@@ -1,0 +1,14 @@
+# generated artifacts
+output/
+/cube.json      # emit_cube.py run standalone writes here
+__pycache__/
+*.pyc
+
+# machine-specific overrides
+config.local.toml
+
+# browser-automation scratch (snapshots/console logs from verification runs)
+.playwright-mcp/
+
+# local working notes (plans/specs), kept out of the repo
+docs/superpowers/

@@ -1,0 +1,1906 @@
+<title>Claude Code Usage Console</title>
+<style>
+  /* ================= Obsidian Flux -- design system =================
+     Flat surfaces, hairline borders, tonal layering. No shadows, no glass,
+     no gradient text. Colour is reserved for data and status; the chrome is
+     neutral, with a single violet accent for interactive state.
+     Model hues are CVD-validated in both themes (worst adjacent dE 8.4 dark /
+     9.1 light); three light-mode hues sit under 3:1, so every chart that uses
+     them ships direct labels or an adjacent table. */
+  :root{
+    color-scheme:dark;
+    --bg:#0d0d0e; --bg-2:#101012;
+    --panel:#161617; --panel-2:#1c1c1e; --panel-solid:#161617;
+    --border:#262626; --border-2:#333335; --hi:transparent;
+    --ink:#e8e8ea; --ink-soft:#a1a1a6; --ink-faint:#6e6e73;
+    --line:#232324; --line-strong:#2f2f31;
+    --accent:#845ef7; --accent-2:#22b8cf; --on-accent:#ffffff;
+    --m-opus:#3987e5; --m-opus48:#d95926; --m-sonnet:#199e70;
+    --m-fable:#c98500; --m-haiku:#d55181;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --serious:#ec835a;
+    --good-ink:#22c55e; --warn-ink:#fab219; --crit-ink:#f87171;
+    --heat0:#17182a; --heat1:#1d2f57; --heat2:#244a86; --heat3:#2c66b8;
+    --heat4:#3987e5; --heat5:#68a6ec; --heat6:#a3c8f5;
+    --mono:"JetBrains Mono",ui-monospace,"SF Mono","Cascadia Code",Menlo,Consolas,monospace;
+    --sans:Inter,"Segoe UI Variable Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --r:8px; --r-sm:4px; --rail:248px;
+  }
+  /* Light is its own stepped set, not an inversion: near-white panels on a
+     warm off-white plane, near-black ink, real hairlines. */
+  @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#f6f6f4; --bg-2:#efefec;
+    --panel:#ffffff; --panel-2:#f4f4f2; --panel-solid:#ffffff;
+    --border:#e3e3df; --border-2:#d0d0ca; --hi:transparent;
+    --ink:#14141a; --ink-soft:#55555e; --ink-faint:#86868c;
+    --line:#ebebe7; --line-strong:#dcdcd7;
+    --accent:#6d3bd7; --accent-2:#0e7490; --on-accent:#ffffff;
+    --m-opus:#2a78d6; --m-opus48:#eb6834; --m-sonnet:#1baf7a;
+    --m-fable:#eda100; --m-haiku:#e87ba4;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --serious:#ec835a;
+    --good-ink:#067306; --warn-ink:#8a5d00; --crit-ink:#a92121;
+    --heat0:#eef3fb; --heat1:#cde2fb; --heat2:#9ec5f4; --heat3:#6da7ec;
+    --heat4:#3987e5; --heat5:#256abf; --heat6:#184f95;
+  }}
+  :root[data-theme="light"]{
+    color-scheme:light;
+    --bg:#f6f6f4; --bg-2:#efefec;
+    --panel:#ffffff; --panel-2:#f4f4f2; --panel-solid:#ffffff;
+    --border:#e3e3df; --border-2:#d0d0ca; --hi:transparent;
+    --ink:#14141a; --ink-soft:#55555e; --ink-faint:#86868c;
+    --line:#ebebe7; --line-strong:#dcdcd7;
+    --accent:#6d3bd7; --accent-2:#0e7490; --on-accent:#ffffff;
+    --m-opus:#2a78d6; --m-opus48:#eb6834; --m-sonnet:#1baf7a;
+    --m-fable:#eda100; --m-haiku:#e87ba4;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b; --serious:#ec835a;
+    --good-ink:#067306; --warn-ink:#8a5d00; --crit-ink:#a92121;
+    --heat0:#eef3fb; --heat1:#cde2fb; --heat2:#9ec5f4; --heat3:#6da7ec;
+    --heat4:#3987e5; --heat5:#256abf; --heat6:#184f95;
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;
+       -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;min-height:100vh;}
+
+  /* ---- shell: fixed rail + independently scrolling content ---- */
+  .rail{position:fixed;inset:0 auto 0 0;width:var(--rail);z-index:30;display:flex;flex-direction:column;
+    background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:18px 14px;gap:4px;}
+  .rail::-webkit-scrollbar{width:8px;}
+  .rail::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px;}
+  .brand{display:flex;align-items:center;gap:10px;padding:2px 8px 14px;}
+  .brand .mk{flex:none;width:22px;height:22px;border-radius:6px;background:var(--accent);
+    display:grid;place-items:center;color:#fff;font-family:var(--mono);font-size:12px;font-weight:700;}
+  .brand .nm{font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--ink);line-height:1.2;}
+  .brand .sb{font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);}
+  .nav{display:flex;flex-direction:column;gap:2px;margin-bottom:6px;}
+  .nav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;cursor:pointer;
+    font-family:var(--sans);font-size:13px;font-weight:500;color:var(--ink-soft);
+    background:transparent;border:none;border-left:2px solid transparent;border-radius:var(--r-sm);
+    padding:8px 10px;transition:background .15s,color .15s;}
+  .nav button:hover{background:var(--panel-2);color:var(--ink);}
+  .nav button.on{background:var(--panel-2);color:var(--ink);border-left-color:var(--accent);font-weight:600;}
+  .nav button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .nav .ic{flex:none;width:15px;height:15px;opacity:.85;}
+  .rail hr{border:none;border-top:1px solid var(--line);margin:12px 2px;}
+  .railsec{padding:0 8px;display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
+  .railfoot{margin-top:auto;padding:14px 8px 2px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:10px;color:var(--ink-faint);line-height:1.7;}
+  .wrap{margin-left:var(--rail);padding:26px 30px 80px;max-width:1600px;}
+  @media (max-width:900px){
+    :root{--rail:0px;}
+    .rail{position:static;width:auto;inset:auto;border-right:none;border-bottom:1px solid var(--border);}
+    .wrap{margin-left:0;padding:20px 16px 60px;}
+  }
+
+  /* ---- page head ---- */
+  .phead{display:flex;justify-content:space-between;align-items:baseline;gap:20px;flex-wrap:wrap;margin-bottom:18px;}
+  h1{font-size:19px;font-weight:600;margin:0;letter-spacing:-.02em;color:var(--ink);}
+  .sub{color:var(--ink-soft);font-size:12.5px;line-height:1.5;margin-top:3px;}
+  .meta{font-family:var(--mono);font-size:11px;color:var(--ink-faint);text-align:right;line-height:1.6;}
+  .toggle{font-family:var(--mono);font-size:11px;background:transparent;color:var(--ink-soft);
+    border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px;cursor:pointer;
+    width:100%;text-align:center;transition:.15s;}
+  .toggle:hover{border-color:var(--accent);color:var(--accent);}
+  .toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* ---- shared surface ---- */
+  .kpi,.panel{background:var(--panel);border:1px solid var(--border);}
+
+  /* ---- rail filter controls ---- */
+  .ctl{display:flex;flex-direction:column;gap:6px;}
+  .ctl>.lab{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;
+    background:var(--bg-2);width:100%;}
+  .seg button{flex:1;font-family:var(--mono);font-size:11px;background:transparent;color:var(--ink-soft);
+    border:none;padding:6px 8px;cursor:pointer;transition:.15s;white-space:nowrap;}
+  .seg button.on{color:var(--ink);background:var(--panel-2);box-shadow:inset 0 0 0 1px var(--border-2);font-weight:600;}
+  .seg button:hover:not(.on){color:var(--ink);}
+  .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+  .reset{font-family:var(--mono);font-size:11px;background:transparent;color:var(--ink-soft);
+    border:1px solid var(--border);border-radius:var(--r-sm);padding:6px 10px;cursor:pointer;transition:.15s;}
+  .reset:hover{border-color:var(--accent);color:var(--accent);}
+  .reset:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+  .hint{font-family:var(--mono);font-size:10px;color:var(--accent);line-height:1.5;}
+  .hint:empty{display:none;}
+  /* The from/to boxes are the real filter; the presets above just fill them in,
+     so the active dates stay readable even while a preset is highlighted. */
+  .dates{display:grid;gap:5px;margin-top:8px;}
+  .dates label{display:grid;grid-template-columns:34px 1fr;align-items:center;gap:7px;
+    font-family:var(--mono);font-size:10px;color:var(--ink-faint);}
+  /* No color-scheme here on purpose: it must inherit the root's (which follows
+     the theme toggle), or the browser draws the calendar icon and the picker
+     popup for the OS preference instead -- a dark icon on a dark field. */
+  .dates input{font-family:var(--mono);font-size:10.5px;color:var(--ink);background:var(--bg-2);
+    border:1px solid var(--border);border-radius:var(--r-sm);padding:4px 24px 4px 6px;width:100%;
+    cursor:pointer;}
+  .dates input:focus{outline:none;border-color:var(--accent);}
+  .dates input:hover{border-color:var(--border-2);}
+  /* The default indicator is a tiny, low-contrast glyph you have to hit exactly.
+     Enlarge it, park it in the padding reserved above, and let the whole field
+     open the picker (see showPicker below). */
+  .dates input::-webkit-calendar-picker-indicator{
+    cursor:pointer;opacity:.5;transition:opacity .15s;
+    width:15px;height:15px;margin:0;padding:0;
+    position:absolute;right:6px;}
+  .dates input:hover::-webkit-calendar-picker-indicator,
+  .dates input:focus::-webkit-calendar-picker-indicator{opacity:1;}
+  .dates label{position:relative;}
+  /* One chip per active filter, each clearing only itself. */
+  .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}
+  .chips .lead{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--ink-faint);width:100%;margin-bottom:2px;}
+  .fchip{display:inline-flex;align-items:center;gap:5px;max-width:100%;
+    font-family:var(--mono);font-size:9.5px;color:var(--accent);background:transparent;
+    border:1px solid color-mix(in srgb,var(--accent) 34%,transparent);
+    border-radius:var(--r-sm);padding:2px 5px 2px 7px;cursor:pointer;transition:.15s;}
+  .fchip:hover{background:color-mix(in srgb,var(--accent) 12%,transparent);}
+  .fchip .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .fchip .x{color:var(--ink-faint);font-weight:700;}
+  .fchip:hover .x{color:var(--accent);}
+  .fchip.static{cursor:default;color:var(--ink-faint);border-color:var(--border);}
+  .fchip.static:hover{background:transparent;}
+  .chips .none{font-family:var(--mono);font-size:10px;color:var(--ink-faint);}
+
+  /* ---- stat tiles ---- */
+  .kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin-bottom:18px;}
+  @media (max-width:1200px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr));}}
+  @media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr));}}
+  .kpi{border-radius:var(--r);padding:13px 14px;display:flex;flex-direction:column;gap:5px;min-width:0;}
+  .kpi .label{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);}
+  .kpi .val{font-family:var(--mono);font-size:25px;font-weight:500;letter-spacing:-.02em;line-height:1.1;color:var(--ink);}
+  .kpi .note{font-size:11px;color:var(--ink-soft);margin-top:auto;line-height:1.35;}
+  .kpi.accent .val{color:var(--ink);}
+  .kpi.good .val{color:var(--good-ink);}
+  .kpi.warn .val{color:var(--warn-ink);}
+
+  /* ---- panels ---- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:1000px){.grid{grid-template-columns:1fr;}}
+  .panel{border-radius:var(--r);padding:16px 18px 14px;margin-bottom:14px;min-width:0;}
+  .panel.full{grid-column:1 / -1;}
+  .panel h2{font-size:13px;font-weight:600;margin:0 0 3px;letter-spacing:-.005em;color:var(--ink);}
+  .panel .desc{font-size:12px;color:var(--ink-soft);margin:0 0 14px;line-height:1.5;}
+  .panel .desc b{color:var(--ink);font-weight:600;}
+  .clickable-note{font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);float:right;font-weight:400;
+    text-transform:none;letter-spacing:.02em;padding:2px 8px;border:1px solid var(--border);border-radius:999px;}
+
+  /* ---- legend chips ---- */
+  .legend{display:flex;flex-wrap:wrap;gap:6px 8px;margin:2px 0 14px;font-family:var(--mono);font-size:11px;}
+  .legend button{display:inline-flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--border);
+    border-radius:var(--r-sm);padding:4px 9px;cursor:pointer;color:var(--ink-soft);font-family:var(--mono);font-size:11px;transition:.15s;}
+  .legend button.off{opacity:.4;}
+  .legend button:hover{border-color:var(--accent);color:var(--ink);}
+  .legend .sw{width:8px;height:8px;border-radius:2px;display:inline-block;}
+  .legend .static{display:inline-flex;align-items:center;gap:6px;color:var(--ink-faint);padding:4px 2px;}
+
+  /* ---- horizontal bars: capped track, value adjacent to the bar end ---- */
+  .rows{display:flex;flex-direction:column;gap:7px;}
+  .row{display:grid;grid-template-columns:150px minmax(0,var(--trackw,380px)) auto;align-items:center;gap:10px;}
+  .row.click{cursor:pointer;} .row.click:hover .name{color:var(--accent);}
+  .row.off{opacity:.38;}
+  .row .name{font-family:var(--mono);font-size:11.5px;color:var(--ink);white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;transition:.15s;}
+  .row .track{background:var(--bg-2);border-radius:3px;height:14px;overflow:hidden;}
+  .row .fill{height:100%;border-radius:0 3px 3px 0;transition:width .4s ease;}
+  .row .amt{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);white-space:nowrap;}
+  /* percentage columns. Two denominators are shown where a category only
+     covers a slice of the tokens (tools, MCP, skills): share of everything in
+     view, and share within its own category. Lists that partition the tokens
+     (projects, models, effort) show one, because both would be the same. */
+  .row.p1{grid-template-columns:150px minmax(0,var(--trackw,380px)) 118px 62px;}
+  .row.p2{grid-template-columns:150px minmax(0,var(--trackw,380px)) 118px 62px 62px;}
+  .row.p3{grid-template-columns:150px minmax(0,var(--trackw,380px)) 118px 62px 62px 54px;}
+  .row .pct{font-family:var(--mono);font-size:11px;color:var(--ink-soft);text-align:right;
+    font-variant-numeric:tabular-nums;}
+  .row .pct.dim{color:var(--ink-faint);}
+  .rowhead{display:grid;gap:10px;align-items:end;font-family:var(--mono);font-size:9px;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--ink-faint);
+    padding-bottom:6px;margin-bottom:8px;border-bottom:1px solid var(--line);}
+  .rowhead.p1{grid-template-columns:150px minmax(0,var(--trackw,380px)) 118px 62px;}
+  .rowhead.p2{grid-template-columns:150px minmax(0,var(--trackw,380px)) 118px 62px 62px;}
+  .rowhead.p3{grid-template-columns:150px minmax(0,var(--trackw,380px)) 118px 62px 62px 54px;}
+  .rowhead .r{text-align:right;}
+  .empty{font-family:var(--mono);font-size:12px;color:var(--ink-faint);padding:14px 2px;}
+
+  svg{display:block;width:100%;height:auto;overflow:visible;}
+  .scroll{overflow-x:auto;overflow-y:hidden;}
+  .scroll::-webkit-scrollbar{height:8px;}
+  .scroll::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px;}
+  text{font-family:var(--mono);fill:var(--ink-faint);}
+  .grid-line{stroke:var(--line);stroke-width:1;}
+
+  /* ---- tables ---- */
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);
+    text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-strong);font-weight:600;}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);font-family:var(--mono);}
+  tbody tr{transition:background .12s;}
+  tbody tr:hover{background:var(--panel-2);}
+  tr:last-child td{border-bottom:none;}
+  .chip{font-family:var(--mono);font-size:9.5px;letter-spacing:.04em;padding:2px 7px;border-radius:var(--r-sm);
+    text-transform:uppercase;font-weight:600;white-space:nowrap;border:1px solid transparent;}
+  .chip.session{background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--warn-ink);border-color:color-mix(in srgb,var(--warn) 34%,transparent);}
+  .chip.weekly{background:color-mix(in srgb,var(--crit) 12%,transparent);color:var(--crit-ink);border-color:color-mix(in srgb,var(--crit) 36%,transparent);}
+  .chip.switch{background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);border-color:color-mix(in srgb,var(--accent) 34%,transparent);}
+  .chip.soft{background:transparent;color:var(--ink-soft);border-color:var(--border);}
+  .chip.stay{background:transparent;color:var(--ink-faint);border-color:var(--border);}
+
+  /* ---- footer & sections ---- */
+  footer{margin-top:28px;border-top:1px solid var(--line);padding-top:18px;color:var(--ink-soft);font-size:12px;line-height:1.6;}
+  footer h3{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 9px;}
+  .cols{columns:2;column-gap:32px;} @media (max-width:760px){.cols{columns:1;}}
+  footer ul{margin:0;padding-left:16px;} footer li{margin-bottom:6px;break-inside:avoid;} footer b{color:var(--ink);}
+
+  .section-break{margin:8px 0 14px;}
+  .section-title{font-size:13px;font-weight:600;margin:0 0 3px;letter-spacing:-.005em;color:var(--ink);}
+  .section-sub{font-size:12px;color:var(--ink-soft);margin:0;max-width:74ch;line-height:1.5;}
+  .section-sub b{color:var(--ink);}
+
+  .delegsplit{display:flex;height:24px;border-radius:var(--r-sm);overflow:hidden;border:1px solid var(--border);}
+  .cachesplit{display:flex;height:30px;border-radius:var(--r-sm);overflow:hidden;gap:2px;}
+  .cachesplit>div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+    font-size:10px;color:var(--bg);white-space:nowrap;overflow:hidden;transition:width .4s ease;}
+  .cachekey{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-family:var(--mono);
+    font-size:10.5px;color:var(--ink-faint);}
+  .cachekey span{display:inline-flex;align-items:center;gap:6px;}
+  .cachekey i{width:9px;height:9px;border-radius:2px;flex:none;}
+  .cachekey b{color:var(--ink-soft);font-weight:600;}
+  .delegsplit>div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+    font-size:10.5px;font-weight:600;white-space:nowrap;}
+  .heatcell{stroke:var(--panel);stroke-width:2;}
+  .heat-lab{font-size:9px;fill:var(--ink-faint);}
+  .heatkey{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;color:var(--ink-faint);}
+  .heatkey i{width:13px;height:13px;border-radius:2px;display:block;}
+  .minibar{height:8px;border-radius:2px;background:var(--bg-2);width:90px;overflow:hidden;}
+  .minibar>i{display:block;height:100%;border-radius:0 2px 2px 0;background:var(--accent);}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink);}
+  td.dow{color:var(--ink-faint);font-size:10.5px;}
+
+  /* ---- live account quota ---- */
+  .lim-acct{display:flex;gap:14px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);}
+  .lim-acct:last-child{border-bottom:none;}
+  .lim-key{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--ink-soft);flex:none;
+    width:26px;height:26px;display:grid;place-items:center;border:1px solid var(--border);border-radius:var(--r-sm);}
+  .lim-bars{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0;}
+  .lim{display:grid;grid-template-columns:22px minmax(0,1fr) 46px auto;align-items:center;gap:10px;}
+  .lim-k{font-family:var(--mono);font-size:10px;color:var(--ink-faint);text-transform:uppercase;}
+  .lim .track{background:var(--bg-2);border-radius:3px;height:10px;overflow:hidden;}
+  .lim .fill{height:100%;border-radius:0 3px 3px 0;transition:width .4s ease;}
+  .lim .fill.good{background:var(--good);}
+  .lim .fill.warn{background:var(--warn);}
+  .lim .fill.crit{background:var(--crit);}
+  .lim-v{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;}
+  .lim-v.good{color:var(--good-ink);} .lim-v.warn{color:var(--warn-ink);} .lim-v.crit{color:var(--crit-ink);}
+  .lim-r{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);white-space:nowrap;}
+  .lim-r .soon{color:var(--good-ink);}
+  .lim-auth{font-family:var(--mono);font-size:12px;color:var(--crit-ink);}
+  /* actionable verdict strip -- the one thing the page exists to tell you */
+  .verdict{display:flex;align-items:flex-start;gap:9px;margin-top:12px;padding:10px 12px;border-radius:var(--r-sm);
+    font-size:12.5px;line-height:1.45;border-left:2px solid var(--ink-faint);background:var(--panel-2);color:var(--ink-soft);}
+  .verdict b{color:var(--ink);font-weight:600;} .verdict .mono{font-family:var(--mono);}
+  .verdict.crit{border-left-color:var(--crit);background:color-mix(in srgb,var(--crit) 8%,transparent);}
+  .verdict.crit b{color:var(--crit-ink);}
+  .verdict.warn{border-left-color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);}
+  .verdict.good{border-left-color:var(--good);background:color-mix(in srgb,var(--good) 7%,transparent);}
+  .verdict .ico{flex:none;font-family:var(--mono);font-weight:700;}
+
+  /* ---- sessions table ---- */
+  .sesswrap{max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--r);}
+  .sesswrap::-webkit-scrollbar{width:9px;}
+  .sesswrap::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:8px;}
+  .sesstable{width:100%;border-collapse:collapse;font-size:11.5px;}
+  .sesstable thead th{position:sticky;top:0;z-index:1;background:var(--panel-solid);}
+  .sesstable th{padding:8px 10px;border-bottom:1px solid var(--line-strong);}
+  .sesstable th.sortable{cursor:pointer;user-select:none;transition:color .15s;}
+  .sesstable th.sortable:hover{color:var(--accent);}
+  .sesstable th.active{color:var(--accent);}
+  .sesstable th.r{text-align:right;}
+  .sesstable td{padding:7px 10px;border-bottom:1px solid var(--line);}
+  .sesstable tbody tr:last-child td{border-bottom:none;}
+  .sess-when{color:var(--ink);white-space:nowrap;}
+  .sess-dir{color:var(--ink-soft);max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  td.sess-tok{white-space:nowrap;}
+  .sess-tok .track{display:inline-block;vertical-align:middle;width:80px;height:8px;overflow:hidden;
+    background:var(--bg-2);border-radius:2px;}
+  .sess-tok .track>i{display:block;height:100%;border-radius:0 2px 2px 0;background:var(--accent);}
+  .sess-tok .tv{display:inline-block;vertical-align:middle;margin-left:9px;min-width:48px;
+    text-align:right;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .sess-id{color:var(--ink-faint);}
+  .copybtn{font-family:var(--mono);font-size:10px;color:var(--ink-soft);background:transparent;
+    border:1px solid var(--border);border-radius:var(--r-sm);padding:3px 9px;cursor:pointer;transition:.15s;}
+  .copybtn:hover{border-color:var(--accent);color:var(--accent);}
+  .copybtn.copied{color:var(--good);border-color:var(--good);}
+  .rowacts{white-space:nowrap;display:flex;gap:6px;}
+  .focusbtn.on{color:var(--accent);border-color:var(--accent);
+    background:color-mix(in srgb,var(--accent) 12%,transparent);}
+  .sesstable tr.focused td{background:color-mix(in srgb,var(--accent) 7%,transparent);}
+  .sesstable td.num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-soft);}
+  .sess-hint{font-size:11px;color:var(--ink-faint);margin:11px 2px 0;line-height:1.5;}
+  .sess-hint code{font-family:var(--mono);color:var(--ink-soft);background:var(--bg-2);padding:1px 5px;border-radius:3px;}
+
+  /* ---- hover cards ----
+     The Tooling rows used to carry title="<the same short label>", which
+     explained nothing and hid the real id (niceName throws the server away).
+     A styled card can hold the full id, what the entry is, and the numbers. */
+  .hovercard{position:fixed;z-index:50;max-width:330px;pointer-events:none;
+    background:var(--panel-solid);border:1px solid var(--border-2);border-radius:var(--r);
+    box-shadow:0 8px 30px rgba(0,0,0,.28);padding:11px 13px;opacity:0;transition:opacity .12s;}
+  .hovercard.show{opacity:1;}
+  .hovercard .hc-h{display:flex;align-items:baseline;gap:9px;margin-bottom:6px;}
+  .hovercard .hc-t{font-family:var(--mono);font-size:12px;color:var(--ink);font-weight:600;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hovercard .hc-tag{font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--ink-faint);margin-left:auto;white-space:nowrap;}
+  .hovercard .hc-b{font-size:11.5px;line-height:1.55;color:var(--ink-soft);
+    overflow-wrap:anywhere;}
+  .hovercard .hc-s{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);
+    font-family:var(--mono);font-size:10.5px;color:var(--ink-faint);line-height:1.65;}
+  .hovercard .hc-s b{color:var(--ink-soft);font-weight:600;}
+  [data-hc]{cursor:help;}
+  .row[data-hc]:focus-visible,.rowhead [data-hc]:focus-visible{outline:2px solid var(--accent);
+    outline-offset:2px;border-radius:3px;}
+
+  /* ---- collapsible panels ---- */
+  .panel h2{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;transition:color .15s;}
+  .panel h2:hover{color:var(--accent);}
+  .panel h2:hover::before{border-color:var(--accent);}
+  .panel h2:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:3px;}
+  .panel h2::before{content:"";flex:none;width:6px;height:6px;margin-top:-3px;
+    border-right:1.5px solid var(--ink-faint);border-bottom:1.5px solid var(--ink-faint);
+    transform:rotate(45deg);transition:transform .3s ease,border-color .15s;}
+  .panel.collapsed h2::before{transform:rotate(-45deg);}
+  .panel h2 .clickable-note{margin-left:auto;float:none;}
+  .pbody{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s ease,opacity .22s ease;}
+  .pinner{min-height:0;overflow:hidden;}
+  .panel.collapsed .pbody{grid-template-rows:0fr;opacity:0;}
+  .panel.collapsed{padding-bottom:14px;}
+
+  /* ---- help / docs ---- */
+  .doc h3{font-size:12px;font-weight:600;margin:20px 0 7px;color:var(--ink);letter-spacing:-.005em;}
+  .doc code{font-family:var(--mono);font-size:11.5px;color:var(--ink);
+    background:var(--bg-2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;}
+  .doc-pre{font-family:var(--mono);font-size:11.5px;line-height:1.6;color:var(--ink);
+    background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-sm);
+    padding:11px 13px;margin:0 0 14px;overflow-x:auto;}
+  .doc-l{margin:0 0 6px;padding-left:17px;color:var(--ink-soft);font-size:12.5px;line-height:1.65;}
+  .doc-l li{margin-bottom:7px;} .doc-l b{color:var(--ink);font-weight:600;}
+  .doc-t{margin:0 0 6px;}
+  .doc-t td{vertical-align:top;font-family:var(--sans);font-size:12.5px;line-height:1.55;color:var(--ink-soft);}
+  .doc-t td:first-child{width:210px;color:var(--ink);white-space:nowrap;}
+  .doc-t td:first-child code{white-space:nowrap;}
+  .doc-t b{color:var(--ink);font-weight:600;}
+  .doc-t thead th{width:auto;}
+  @media (max-width:820px){.doc-t td:first-child{width:auto;white-space:normal;}}
+
+  /* section routing -- panels not in the active section are unmounted visually */
+  .sec-off{display:none!important;}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <linearGradient id="g-opus" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--m-opus)"/><stop offset="1" style="stop-color:var(--m-opus);stop-opacity:.5"/></linearGradient>
+  <linearGradient id="g-opus48" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--m-opus48)"/><stop offset="1" style="stop-color:var(--m-opus48);stop-opacity:.5"/></linearGradient>
+  <linearGradient id="g-sonnet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--m-sonnet)"/><stop offset="1" style="stop-color:var(--m-sonnet);stop-opacity:.5"/></linearGradient>
+  <linearGradient id="g-fable" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--m-fable)"/><stop offset="1" style="stop-color:var(--m-fable);stop-opacity:.5"/></linearGradient>
+  <linearGradient id="g-haiku" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--m-haiku)"/><stop offset="1" style="stop-color:var(--m-haiku);stop-opacity:.5"/></linearGradient>
+  <linearGradient id="g-accent" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--accent)"/><stop offset="1" style="stop-color:var(--accent);stop-opacity:.5"/></linearGradient>
+</defs></svg>
+<nav class="rail" aria-label="Sections and filters">
+  <div class="brand">
+    <div class="mk">&#9670;</div>
+    <div><div class="nm">Usage Console</div><div class="sb">127.0.0.1:8787</div></div>
+  </div>
+
+  <div class="nav" id="nav" role="tablist">
+    <button data-sec="now" class="on" type="button" role="tab"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Overview</button>
+    <button data-sec="usage" type="button" role="tab"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 13V7M6 13V3M10 13V9M14 13V5"/></svg>Usage</button>
+    <button data-sec="patterns" type="button" role="tab"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg>Patterns</button>
+    <button data-sec="tooling" type="button" role="tab"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M10.5 2.5a3.5 3.5 0 0 0-4.6 4.3L2.5 10.2l1.8 1.8 3.4-3.4a3.5 3.5 0 0 0 4.3-4.6l-2 2-1.5-1.5z"/></svg>Tooling</button>
+    <button data-sec="limits" type="button" role="tab"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M8 2.5 14 13H2z"/><path d="M8 6.5v3M8 11.2v.1"/></svg>Limits</button>
+    <button data-sec="help" type="button" role="tab"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M6.2 6.1a1.9 1.9 0 1 1 2.4 2.2c-.4.2-.6.5-.6.9v.3"/><path d="M8 12.1v.1"/></svg>Help</button>
+  </div>
+
+  <hr>
+
+  <div class="railsec">
+    <div class="ctl"><span class="lab">Granularity</span>
+      <div class="seg" id="segGran">
+        <button data-v="day" class="on" type="button">Day</button>
+        <button data-v="week" type="button">Week</button>
+        <button data-v="month" type="button">Month</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="lab">Date range</span>
+      <div class="seg" id="segRange">
+        <button data-v="1" type="button">Today</button>
+        <button data-v="7" type="button">7d</button>
+        <button data-v="30" type="button">30d</button>
+        <button data-v="all" class="on" type="button">All</button>
+      </div>
+      <div class="dates">
+        <label>From <input type="date" id="dFrom"></label>
+        <label>To <input type="date" id="dTo"></label>
+      </div>
+    </div>
+    <button class="reset" id="resetBtn" type="button">Reset filters</button>
+    <button class="reset" id="toggleAll" type="button">Collapse all</button>
+    <div class="chips" id="filterChips"></div>
+  </div>
+
+  <div class="railfoot">
+    <div id="meta"></div>
+    <button class="toggle" id="themeBtn" type="button" style="margin-top:9px">&#9681; theme</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="phead">
+    <div>
+      <h1 id="secTitle">Overview</h1>
+      <div class="sub" id="subline"></div>
+    </div>
+  </div>
+
+  <section class="kpis" id="kpis" data-sec="now"></section>
+
+  <section class="panel full" id="limitsPanel" data-sec="now" hidden>
+    <h2>Account limits <span class="clickable-note" id="limitsAge"></span></h2>
+    <p class="desc">Live 5-hour and weekly quota per account &mdash; the same numbers your status line shows, refreshed every minute. Not affected by the filters below.</p>
+    <div id="limitsBody"></div>
+    <div class="verdict" id="limitsVerdict" hidden></div>
+  </section>
+
+  <section class="panel full" data-sec="now">
+    <h2>Volume by model <span class="clickable-note">click a model to isolate</span></h2>
+    <p class="desc" id="tl-desc"></p>
+    <div class="legend" id="tl-legend"></div>
+    <div class="scroll"><div id="timeline"></div></div>
+  </section>
+
+  <section class="panel full" data-sec="usage">
+    <h2>Daily usage <span class="clickable-note">exact per-day figures &middot; newest first</span></h2>
+    <p class="desc" id="daily-desc"></p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Date</th><th></th><th style="text-align:right">Tokens</th><th></th>
+          <th style="text-align:right">Calls</th><th style="text-align:right">Reuse</th>
+          <th>Top model</th><th>Limits</th></tr></thead>
+        <tbody id="dailyRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel full" data-sec="usage">
+    <h2>Cache economics <span class="clickable-note">follows every filter</span></h2>
+    <p class="desc">What the tokens in view actually are. <b>Cache reads</b> are context re-read from an existing cache, billed at a fraction; <b>cache writes</b> are what it cost to put it there; <b>output</b> is what was generated. Only <b>fresh input</b> and output are new work.</p>
+    <div id="cacheSplit"></div>
+    <div class="verdict good" id="cacheVerdict" style="margin-top:14px"></div>
+    <div class="scroll" style="margin-top:16px"><div id="cacheTrend"></div></div>
+    <p class="desc" style="margin:10px 0 0">Reuse per <b id="cacheGran">day</b> &mdash; cache reads divided by cache writes. A dip is a stretch of rebuilding context rather than re-reading it.</p>
+  </section>
+
+  <div class="grid">
+    <section class="panel" id="acctPanel" data-sec="usage" hidden>
+      <h2>By account <span class="clickable-note">click to isolate</span></h2>
+      <p class="desc">Measured, not inferred &mdash; each account writes to its own transcripts directory.</p>
+      <div class="rows" id="accounts"></div>
+    </section>
+
+    <section class="panel" data-sec="usage">
+      <h2>Where the tokens go <span class="clickable-note">click to isolate</span></h2>
+      <p class="desc">By working directory. Click a bar to focus one workspace; click it again, or Reset, to clear.</p>
+      <div class="rows" id="projects"></div>
+    </section>
+
+    <section class="panel" data-sec="usage">
+      <h2>Model mix <span class="clickable-note">click to isolate</span></h2>
+      <p class="desc">Share of tokens in the current view.</p>
+      <div class="rows" id="models"></div>
+    </section>
+
+    <section class="panel" data-sec="usage">
+      <h2>Reasoning effort <span class="clickable-note">click to isolate</span></h2>
+      <p class="desc"><b>unset</b> is older records / models without an effort field &mdash; not a level.</p>
+      <div class="rows" id="effort"></div>
+    </section>
+
+    <section class="panel" data-sec="patterns">
+      <h2>When you work &mdash; by hour (IST)</h2>
+      <p class="desc">Token volume by hour of day, across the current view.</p>
+      <div id="hours"></div>
+    </section>
+
+    <section class="panel full" data-sec="patterns">
+      <h2>Weekly rhythm &mdash; day &times; hour (IST)</h2>
+      <p class="desc">Tokens by weekday and hour, across the current view.</p>
+      <div class="heatkey" style="margin:0 0 12px">less
+        <i style="background:var(--heat0)"></i><i style="background:var(--heat1)"></i><i style="background:var(--heat2)"></i><i style="background:var(--heat3)"></i><i style="background:var(--heat4)"></i><i style="background:var(--heat5)"></i><i style="background:var(--heat6)"></i>
+        more</div>
+      <div class="scroll"><div id="heatmap"></div></div>
+    </section>
+
+    <section class="panel full" data-sec="limits">
+      <h2>Limit episodes</h2>
+      <p class="desc" id="inc-desc"></p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>When (IST)</th><th>Limit</th><th>Workspace</th></tr></thead>
+          <tbody id="incidents"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="section-break" data-sec="tooling">
+    <h2 class="section-title">Tooling &amp; workflow deep-dive</h2>
+    <p class="section-sub">Follows the <b>date range</b>, <b>workspace</b> and <b>session</b> filters, like the rest of the page &mdash; and, where accounts have their own transcripts, the account too, since a session belongs to exactly one. Model and effort isolation do <b>not</b> apply here. Skill and MCP tags are only set <i>inside</i> those contexts, so they cover a slice of the tokens in view, not a partition of them.</p>
+  </div>
+
+  <div class="grid">
+    <section class="panel full" data-sec="tooling">
+      <h2>Token cost by <span id="attrKind">tool</span>
+        <span class="clickable-note" id="attrNote"></span></h2>
+      <div class="seg" id="segAttr" style="margin:2px 0 14px">
+        <button data-v="tools" class="on" type="button" data-hc data-hc-title="Tools" data-hc-tag="attribution" data-hc-body="Every tool call, MCP tools included. A turn invokes at most one tool, so the tool is credited that whole turn &mdash; these figures are exact, not a split.">Tools</button>
+        <button data-v="mcp" type="button" data-hc data-hc-title="MCP servers" data-hc-tag="attribution" data-hc-body="Tokens spent while a call to an MCP server was in flight. Tagged only inside such a call, so this covers a slice of your tokens rather than splitting them up.">MCP servers</button>
+        <button data-v="mcp_tools" type="button" data-hc data-hc-title="MCP tools" data-hc-tag="attribution" data-hc-body="The individual tool within an MCP server, rather than the server as a whole.">MCP tools</button>
+        <button data-v="skills" type="button" data-hc data-hc-title="Skills" data-hc-tag="attribution" data-hc-body="Tokens spent while a skill's instructions were loaded. Tagged only inside a running skill, so this too is a slice rather than a partition.">Skills</button>
+        <button data-v="sessions" type="button" data-hc data-hc-title="Sessions" data-hc-tag="filter" data-hc-body="One row per Claude Code session, placed by when it was last used. Focus one or more to filter every panel; copy an id to resume it.">Sessions</button>
+        <button data-v="workspaces" type="button" data-hc data-hc-title="Workspaces" data-hc-tag="filter" data-hc-body="One row per directory Claude Code has run in &mdash; every one, unlike the top-ten bars in Where the tokens go. Focus one or more to filter every panel.">Workspaces</button>
+      </div>
+      <div id="attrBars"></div>
+    </section>
+
+    <section class="panel full" data-sec="tooling">
+      <h2>Delegation to subagents</h2>
+      <p class="desc">Work handed to subagents vs done in the main thread. <b id="delegLine"></b></p>
+      <div id="delegBar"></div>
+      <div class="scroll" style="margin-top:14px"><div id="delegTrend"></div></div>
+      <p class="desc" style="margin:12px 0 0" id="truncLine"></p>
+    </section>
+
+  </div>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>What this is</h2>
+    <p class="desc">A local, read-only view of your own Claude Code usage. It reads the transcript files Claude Code already writes under <code>~/.claude/projects</code>, aggregates them, and serves the result on <code>127.0.0.1</code>. <b>Nothing is uploaded and nothing is sent anywhere</b> &mdash; the one outbound request is the quota lookup described below, which goes to Anthropic over HTTPS. There is no login, no database, no telemetry.</p>
+    <p class="desc">Requirements: <b>Python 3.11+</b>. No third-party packages.</p>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>Running it</h2>
+    <table class="doc-t">
+      <tbody>
+        <tr><td><code>python serve.py</code></td><td>Builds, serves on <code>http://127.0.0.1:8787/</code>, opens your browser. Leave it running; it regenerates on the configured interval and the open tab reloads itself. <code>Ctrl+C</code> stops it.</td></tr>
+        <tr><td><code>python build.py</code></td><td>One-shot regenerate of <code>output/dashboard.html</code>, without serving. That file is entirely self-contained &mdash; you can open it directly or copy it elsewhere.</td></tr>
+        <tr><td><code>python emit_cube.py</code></td><td>Just the data step. Run standalone it writes <code>cube.json</code> next to the script, <i>not</i> into <code>output/</code>.</td></tr>
+      </tbody>
+    </table>
+    <h3>Start automatically at logon (Windows)</h3>
+    <table class="doc-t">
+      <tbody>
+        <tr><td><code>pwsh -File install.ps1</code></td><td>Registers it to start hidden at every logon and starts it now. Runs <code>pythonw serve.py --no-browser</code> &mdash; no console window, no browser popup.</td></tr>
+        <tr><td><code>pwsh -File uninstall.ps1</code></td><td>Stops the server and removes the auto-start. Leaves your files, config and generated output alone.</td></tr>
+      </tbody>
+    </table>
+    <p class="desc">It tries a <b>Scheduled Task</b> first, which also restarts the server within a minute if it ever crashes. Registering a task needs elevation, so from a non-elevated shell it prints <code>Access is denied</code> and <b>falls back automatically</b> to a per-user logon Run key &mdash; still auto-starts, just without the crash-restart. For that too, run <code>install.ps1</code> from an elevated PowerShell.</p>
+    <p class="desc">Once it's installed, bookmark <code>http://127.0.0.1:8787/</code>. Don't also run <code>python serve.py</code> by hand while it's up &mdash; they'd fight over the port.</p>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>Configuration</h2>
+    <p class="desc">Everything lives in <code>config.toml</code>. Machine-specific values belong in <code>config.local.toml</code> (gitignored), which is merged over the top so the repo stays portable.</p>
+    <table class="doc-t">
+      <thead><tr><th>Key</th><th>Default</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>refresh_minutes</code></td><td><code>60</code></td><td>How often to regenerate, and how often the open page reloads. Re-read every cycle, so a change takes effect on the next refresh with no restart.</td></tr>
+        <tr><td><code>port</code></td><td><code>8787</code></td><td>Local port, bound to <code>127.0.0.1</code> only. Changing it needs a restart.</td></tr>
+        <tr><td><code>open_browser</code></td><td><code>true</code></td><td>Open a browser when <code>serve.py</code> starts by hand.</td></tr>
+        <tr><td><code>tz_offset_hours</code></td><td><code>5.5</code></td><td>Your UTC offset. Days and hours are bucketed in this timezone.</td></tr>
+        <tr><td><code>tz_label</code></td><td><code>Asia/Kolkata (UTC+5:30)</code></td><td>Shown in the sidebar footer.</td></tr>
+        <tr><td><code>transcripts_dir</code></td><td><code>""</code></td><td>Override where transcripts are read from. Leave blank and it follows your <code>accounts</code> (each account's <code>&lt;dir&gt;/projects</code>), or just <code>~/.claude/projects</code> when none are set. Accepts a single path, or a list to read several.</td></tr>
+        <tr><td><code>accounts</code></td><td><code>[]</code></td><td>Logins for the quota panel. Empty auto-detects <code>~/.claude</code> &mdash; see below.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>The quota panel</h2>
+    <p class="desc">The <b>Overview</b> section shows your live 5-hour and weekly windows &mdash; the same figures <code>/usage</code> reports. These are fetched from Anthropic's read-only OAuth usage endpoint using the access token already stored in your <code>.credentials.json</code>. The token authorises that one request; it is never logged or written anywhere. <b>This lookup does not consume model quota.</b></p>
+    <p class="desc">Refresh cadence is deliberately gentle, because the endpoint rate-limits bursts: roughly every <b>30 minutes</b> normally, <b>60</b> for an account sitting at exactly 0%, and <b>4</b> after a transient failure. The panel itself re-reads the cache every minute, so "updated Nm ago" is the age of the data, not of the page.</p>
+    <p class="desc">Unlike every other panel, quota is <b>not</b> affected by the filters &mdash; it is a live reading, not history.</p>
+    <h3>Statuses you may see</h3>
+    <table class="doc-t">
+      <tbody>
+        <tr><td><span class="chip soft">not signed in</span></td><td>That account's token was rejected. Run <code>claude</code> for it once to sign back in. The dashboard deliberately never refreshes tokens itself &mdash; doing so rewrites <code>.credentials.json</code>, which a live session for that account owns.</td></tr>
+        <tr><td><span class="chip soft">panel missing</span></td><td>No <code>.credentials.json</code> was found for any configured account, so there is nothing to show.</td></tr>
+      </tbody>
+    </table>
+    <h3>The verdict line</h3>
+    <p class="desc">Beneath the bars, one sentence states the conclusion rather than leaving you to derive it. If a 5-hour window is exhausted it names the account with headroom and counts down the wait. Otherwise it judges the week <b>against elapsed pace</b>, which is the only way a weekly percentage means anything: 82% spent is fine on day six and alarming on day two.</p>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>Using more than one account</h2>
+    <p class="desc">Most people have one, and a stock install needs no setup &mdash; <code>~/.claude</code> is found automatically. If you do run a second login, Claude Code has to be told to use it, and there are two ways to do that. <b>Which one you pick changes what this dashboard can show you</b>, so pick deliberately.</p>
+
+    <h3>Option A &mdash; one config, separate credentials <span class="chip soft">recommended</span></h3>
+    <p class="desc">Both accounts share <code>~/.claude</code> &mdash; same settings, same MCP servers, same memory, same project history &mdash; and only the stored credential differs. Point <code>CLAUDE_SECURESTORAGE_CONFIG_DIR</code> at a second folder and define a shortcut for it.</p>
+    <p class="desc">Git Bash / zsh &mdash; add to <code>~/.bashrc</code> or <code>~/.zshrc</code>:</p>
+    <pre class="doc-pre">alias claudeb='CLAUDE_SECURESTORAGE_CONFIG_DIR="$HOME/.creds-b" command claude'</pre>
+    <p class="desc">PowerShell &mdash; add to your <code>$PROFILE</code>:</p>
+    <pre class="doc-pre">function claudeb { $env:CLAUDE_SECURESTORAGE_CONFIG_DIR = "$HOME\.creds-b"; claude @args }</pre>
+    <p class="desc">Open a new shell and run <code>claudeb</code> once. It has no credential yet, so it will take you through the normal browser login &mdash; sign in as the <i>second</i> account. From then on <code>claude</code> is account A and <code>claudeb</code> is account B. <code>command claude</code> in the alias is what stops it recursing into itself.</p>
+    <p class="desc">Then list both in <code>config.toml</code> &mdash; <code>dir</code> is the folder holding that account's <code>.credentials.json</code>, and <code>label</code> is what appears beside its bars:</p>
+    <pre class="doc-pre">accounts = [
+  { label = "A", dir = "~/.claude" },
+  { label = "B", dir = "~/.creds-b" },
+]</pre>
+    <p class="desc"><b>What you get:</b> both quotas, side by side. <b>Usage covers both accounts</b>, because both write to the same transcript folder &mdash; but for that same reason it arrives <b>combined</b>. Nothing on a record says which account produced it, so tokens, calls, projects, models and sessions are the total across both, and no amount of work on this tool can split them.</p>
+    <p class="desc"><b>One caveat:</b> <code>CLAUDE_SECURESTORAGE_CONFIG_DIR</code> is undocumented. Confirm your Claude Code version honours it &mdash; run <code>claudeb</code> and check it prompts for a fresh login rather than reusing account A &mdash; before relying on it.</p>
+
+    <h3>Option B &mdash; a config directory per account <span class="chip switch">splits usage</span></h3>
+    <p class="desc">Each account gets its own settings, MCP servers, memory <i>and its own transcripts</i>. Override <code>CLAUDE_CONFIG_DIR</code> instead:</p>
+    <pre class="doc-pre">alias claudew='CLAUDE_CONFIG_DIR="$HOME/.claude-work" command claude'</pre>
+    <pre class="doc-pre">function claudew { $env:CLAUDE_CONFIG_DIR = "$HOME\.claude-work"; claude @args }</pre>
+    <p class="desc">Run <code>claudew</code> once and sign in as the second account, exactly as above. Because the whole config directory moves, that account's credentials <i>and</i> its transcripts live inside it &mdash; so one entry per account covers both quota and usage:</p>
+    <pre class="doc-pre">accounts = [
+  { label = "personal", dir = "~/.claude" },
+  { label = "work",     dir = "~/.claude-work" },
+]</pre>
+    <p class="desc">Transcripts are looked for at <code>&lt;dir&gt;/projects</code> for each account. If yours live somewhere else, say so explicitly with a <code>transcripts</code> key:</p>
+    <pre class="doc-pre">{ label = "work", dir = "~/.claude-work", transcripts = "D:/claude-work/projects" }</pre>
+    <p class="desc"><b>What you get: everything Option A gives you, plus real per-account usage.</b> The dashboard reads every account's transcripts directory, and because the folder a transcript came from <i>is</i> the account, attribution is <b>measured rather than inferred</b>. A <b>By account</b> panel appears in <i>Usage</i>, and clicking an account isolates it across every other panel &mdash; daily volume, projects, models, effort, hours, heatmap, limit episodes and sessions all follow. Sessions carry the owning account too.</p>
+    <p class="desc">Two things stay combined even here: the <b>Tooling</b> attribution panels (tools, MCP, skills), which are noted as such in that section, and anything Claude Code writes outside a configured directory.</p>
+
+    <h3>Which to choose</h3>
+    <table class="doc-t">
+      <thead><tr><th></th><th>Option A &mdash; shared config</th><th>Option B &mdash; separate configs</th></tr></thead>
+      <tbody>
+        <tr><td>Quota per account</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Usage complete</td><td>Yes</td><td>Yes</td></tr>
+        <tr><td>Usage split per account</td><td><b>No</b> &mdash; impossible, not merely unimplemented</td><td><b>Yes</b> &mdash; measured</td></tr>
+        <tr><td>Shared settings, MCP servers, memory, history</td><td>Yes</td><td>No &mdash; each account is its own world</td></tr>
+        <tr><td>Relies on an undocumented env var</td><td>Yes</td><td>No</td></tr>
+      </tbody>
+    </table>
+    <p class="desc" style="margin-bottom:0">So: pick <b>A</b> if you want one environment and only care about watching two quota pools. Pick <b>B</b> if you want to know which account the work actually went to, and don't mind maintaining two configurations.</p>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>Reading the page</h2>
+    <ul class="doc-l">
+      <li><b>Sections</b> in the rail split the console into Overview, Usage, Patterns, Tooling and Limits. Your last section is remembered.</li>
+      <li><b>Filters</b> live in the rail permanently, so nothing ever floats over your data. Granularity (day / week / month) and the date range apply to <b>every</b> section. The presets fill the <b>From</b> and <b>To</b> boxes, which are what actually filter &mdash; type into either, or click one to open a calendar, for any range you like. The preset highlight drops away as soon as the dates stop matching it, and a range entered backwards is swapped rather than showing you nothing.</li>
+      <li><b>Click to isolate.</b> Clicking a project, model, effort level or legend chip filters every other panel to it. Click again, or <i>Reset filters</i>, to clear.</li>
+      <li><b>Focus</b> under <i>Tooling &rarr; Token cost by</i>: the <b>Sessions</b> and <b>Workspaces</b> tables carry a focus button per row. Focus as many as you like to compare them; click <b>focused</b> again to drop one. Workspaces share their filter with the <i>Where the tokens go</i> bars, so the two always agree.</li>
+      <li><b>Every active filter appears as a chip</b> in the rail, and each chip's &times; clears only itself. <i>Reset filters</i> clears the lot.</li>
+      <li><b>Hover anything in Tooling</b> &mdash; a row, a column header, a tab &mdash; for what it is, its full id (MCP tools are shown shortened) and its numbers spelled out.</li>
+      <li><b>Cache economics</b> in <i>Usage</i> splits the tokens in view into cache reads, cache writes, output and fresh input, and charts reuse over time. Sessions, workspaces and every Tooling row carry a <b>Reuse</b> figure of their own &mdash; how many times each cached token was read back. A low one means context was being rebuilt rather than re-read.</li>
+      <li><b>Cross-filtering</b> computes each facet with every filter <i>except its own</i>, so you can always see what else exists to switch to.</li>
+      <li><b>Collapse</b> any panel by clicking its heading, or use <i>Collapse all</i>. Collapsed state is remembered.</li>
+      <li><b>Log scale</b> appears automatically on a bar list spanning 2+ orders of magnitude, labelled underneath. Without it the long tail is an invisible sliver &mdash; your model volumes run from billions down to hundreds of thousands.</li>
+      <li><b>Percentages.</b> <code>VIEW</code> is the share of everything in the current date range. In Tooling a second column (<code>TOOLS</code>, <code>SKILLS</code>&hellip;) is the share within that category &mdash; those categories cover a slice of your tokens, not a partition, so both numbers are needed. Lists that <i>do</i> partition (projects, models, effort) show only <code>VIEW</code>.</li>
+      <li><b>Theme</b> follows your OS until you use the toggle, after which your choice sticks across reloads.</li>
+      <li><b>Filters, section, collapsed panels and theme all persist</b>, so the periodic auto-reload never disturbs your view.</li>
+    </ul>
+    <h3>Resuming a session</h3>
+    <p class="desc">Under <b>Tooling &rarr; Token cost by &rarr; Sessions</b> is every session, sortable by any column, with <b>focus</b> and <b>copy</b> buttons. Resume one with:</p>
+    <pre class="doc-pre">claude --resume &lt;id&gt;</pre>
+    <p class="desc">Sessions are placed by when they were <b>last used</b> &mdash; the timestamp shown, and the one that matters for picking one back up.</p>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>Troubleshooting</h2>
+    <table class="doc-t">
+      <thead><tr><th>Symptom</th><th>Cause and fix</th></tr></thead>
+      <tbody>
+        <tr><td>Page won't load / port in use</td><td>The logon task is probably already serving it. Open <code>http://127.0.0.1:8787/</code> rather than starting a second copy, or change <code>port</code> and restart.</td></tr>
+        <tr><td>Quota panel absent</td><td>No <code>.credentials.json</code> found. Sign in with <code>claude</code>, or point <code>accounts[].dir</code> at the right folder.</td></tr>
+        <tr><td>Quota stuck at an old reading</td><td>Expected after a failed fetch &mdash; the last good numbers are kept and only the age grows. It retries on its own.</td></tr>
+        <tr><td>"Today" shows nothing</td><td>You haven't run Claude Code yet today. Today is the wall-clock day, not the most recent day with data.</td></tr>
+        <tr><td>Days or hours look shifted</td><td><code>tz_offset_hours</code> doesn't match your actual timezone.</td></tr>
+        <tr><td>A project is missing</td><td><i>Where the tokens go</i> shows the top ten only. <i>Tooling &rarr; Token cost by &rarr; Workspaces</i> lists every one, sortable.</td></tr>
+        <tr><td>Every panel is empty</td><td>The date range selects no data, or a focused session sits outside it. Check the filter chips in the rail &mdash; each &times; clears one &mdash; or press <i>Reset filters</i>.</td></tr>
+        <tr><td>Filters were forgotten once</td><td>Expected on the first load after upgrading to the from/to date range: the saved format changed and the old value had no equivalent. They persist again from then on.</td></tr>
+        <tr><td>A second account's usage is missing</td><td>Its transcripts directory isn't being read. Add the account to <code>accounts</code> so <code>&lt;dir&gt;/projects</code> is picked up, or point a <code>transcripts</code> key at the right folder. Note an explicit <code>transcripts_dir</code> overrides all of that.</td></tr>
+        <tr><td>No <b>By account</b> panel</td><td>Usage only splits when <i>every</i> configured account has its own transcripts directory. If two accounts share one config directory the data genuinely cannot be split, and the panel is hidden rather than showing a guess.</td></tr>
+        <tr><td>Build fails on a non-ASCII character</td><td>The generated page is deliberately pure ASCII, since it declares no charset and must render correctly however it's opened. The error names the character and line &mdash; use an HTML entity or a <code>\uXXXX</code> escape in the template.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel full doc" data-sec="help">
+    <h2>Files</h2>
+    <table class="doc-t">
+      <tbody>
+        <tr><td><code>config.toml</code></td><td>Your settings (with <code>config.local.toml</code> merged over it).</td></tr>
+        <tr><td><code>serve.py</code></td><td>Long-running server and refresh loop &mdash; this is what auto-starts.</td></tr>
+        <tr><td><code>build.py</code></td><td>One-shot regenerate of <code>output/dashboard.html</code>.</td></tr>
+        <tr><td><code>emit_cube.py</code></td><td>Reads the transcripts, writes the compact data cube.</td></tr>
+        <tr><td><code>limits.py</code></td><td>Fetches live 5-hour / weekly quota for the configured accounts.</td></tr>
+        <tr><td><code>dashboard.template.html</code></td><td>The page itself, with <code>__DATA__</code>, <code>__REFRESH__</code>, <code>__HOME__</code> and <code>__LOGIC__</code> placeholders.</td></tr>
+        <tr><td><code>dashboard.logic.js</code></td><td>Pure logic &mdash; dates, filter sets, chips, tooltip copy. Inlined into the page by <code>build.py</code>, and unit-tested on its own with <code>node --test</code>.</td></tr>
+        <tr><td><code>dashboard_config.py</code></td><td>Config loader shared by <code>build.py</code> and <code>serve.py</code>.</td></tr>
+        <tr><td><code>install.ps1</code> / <code>uninstall.ps1</code></td><td>Register or remove the logon auto-start.</td></tr>
+        <tr><td><code>output/</code></td><td>Generated <code>dashboard.html</code>, <code>cube.json</code>, <code>limits-cache.json</code>, <code>serve.log</code> (all gitignored).</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer data-sec="help">
+    <h3>What these numbers are &mdash; and aren't</h3>
+    <div class="cols">
+    <ul>
+      <li><b>Claude Code CLI only.</b> claude.ai, Desktop and Cowork share the same subscription but write nothing locally &mdash; every figure is a <b>lower bound</b>.</li>
+      <li><b>Not a bill.</b> On Pro nothing here is charged; tokens are the currency.</li>
+      <li><b>Deduplicated.</b> 52% of raw records are streaming partials or resume-copies; counting them naively doubles every total.</li>
+      <li><b>Cache reuse is the whole story.</b> ~98% of tokens are re-read context billed at a fraction &mdash; why heavy use fits a flat plan.</li>
+      <li id="acctCaveat"></li>
+      <li><b>Local-model noise removed.</b> Ollama experiments were excluded by model name, not directory.</li>
+    </ul>
+    </div>
+  </footer>
+</div>
+
+<div class="hovercard" id="hcard" role="tooltip" aria-hidden="true" hidden></div>
+
+<script>
+/*__LOGIC__*/
+const CUBE = /*__DATA__*/{};
+const REFRESH_SECONDS = /*__REFRESH__*/0;
+// fact columns: [dayIdx, hour, projIdx, modelIdx, effortIdx, acctBit, sessIdx, tokens, cacheRead, cacheWrite, outTokens, calls]
+const D_DAY=0,D_HOUR=1,D_PROJ=2,D_MODEL=3,D_EFF=4,D_ACCT=5,D_SESS=6,T_TOK=7,T_CR=8,T_CW=9,T_OUT=10,T_CALLS=11;
+// attribution tail row: [dayIdx, projIdx, sessIdx, tokens, cacheRead, cacheWrite, calls]
+const A_DAY=0,A_PROJ=1,A_SESS=2,A_TOK=3,A_CR=4,A_CW=5,A_CALLS=6;
+// delegation row: [dayIdx, projIdx, sessIdx, mainTok, subTok, mainCalls, subCalls]
+const G_DAY=0,G_PROJ=1,G_SESS=2,G_MAIN_TOK=3,G_SUB_TOK=4,G_MAIN_CA=5,G_SUB_CA=6;
+// All column constants live here together: the draw functions are hoisted but
+// these are not, and render() reaches drawDeleg before the file's midpoint.
+
+const $=id=>document.getElementById(id);
+// Cache reuse: how many times each written token was read back. No writes means
+// no ratio to state, so say so rather than printing a zero.
+const reuseTxt=(cr,cw)=>cw?(cr/cw).toFixed(cr/cw>=10?0:1)+"\u00d7":"\u2014";
+// Card content goes into data-* attributes, so anything with a quote in it
+// would otherwise break out of the attribute.
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+// For attribute values that intentionally contain markup: neutralise only what
+// would terminate the attribute.
+const escAttr=s=>String(s).replace(/"/g,"&quot;");
+const fmt=n=>{ n=Math.round(n);
+  if(n>=1e9)return (n/1e9).toFixed(2)+"B";
+  if(n>=1e6)return (n/1e6).toFixed(n>=1e8?0:1)+"M";
+  if(n>=1e3)return (n/1e3).toFixed(0)+"K";
+  return String(n);};
+
+// One hue per model, fixed for the life of the page: colour follows the model,
+// never its rank, so filtering never repaints the survivors. Opus 5 and Opus 4.8
+// get separate hues -- they used to share one, which made the stack unreadable.
+const MODEL_META={
+  "claude-opus-5":["Opus 5","var(--m-opus)"],
+  "claude-opus-4-8":["Opus 4.8","var(--m-opus48)"],
+  "claude-sonnet-5":["Sonnet 5","var(--m-sonnet)"],
+  "claude-fable-5":["Fable 5","var(--m-fable)"],
+  "claude-haiku-4-5-20251001":["Haiku 4.5","var(--m-haiku)"]};
+// Prettify an unknown model id (e.g. a brand-new release) rather than showing the raw slug.
+const mName=k=>MODEL_META[k]?MODEL_META[k][0]:String(k).replace(/^claude-/,"").replace(/-\d{8}$/,"");
+const mColor=k=>(MODEL_META[k]||["","var(--accent)"])[1];
+const _GRAD={"claude-opus-5":"url(#g-opus)","claude-opus-4-8":"url(#g-opus48)","claude-sonnet-5":"url(#g-sonnet)","claude-fable-5":"url(#g-fable)","claude-haiku-4-5-20251001":"url(#g-haiku)"};
+const mGrad=k=>_GRAD[k]||"url(#g-accent)";
+// Folder names encode a cwd with separators flattened to "-" (C--Users-Ada-...).
+// HOME_SLUG is this machine's home in that same encoding, injected at build time,
+// so the shortening works for whoever is running it rather than one hardcoded user.
+const HOME_SLUG=/*__HOME__*/"";
+const proj=n=>{let s=n;
+  if(HOME_SLUG){
+    if(s===HOME_SLUG) s="~";
+    else if(s===HOME_SLUG+"-projects") s="~/projects";
+    else if(s.startsWith(HOME_SLUG+"-projects-")) s=s.slice((HOME_SLUG+"-projects-").length);
+    else if(s.startsWith(HOME_SLUG+"-")) s="~/"+s.slice(HOME_SLUG.length+1);
+  }
+  s=s.replace(/^([A-Za-z])--$/,"$1:/ (root)").replace(/^([A-Za-z])--/,"$1:/")
+    .replace(/-/g,"/");return s||"home";};
+
+// Paths identify a project by their tail, so drop characters from the front.
+const shortPath=(s,n)=>s.length<=n?s:"\u2026"+s.slice(-(n-1));
+
+const nDays=CUBE.days.length, nProj=CUBE.projects.length, nModel=CUBE.models.length, nEff=CUBE.efforts.length;
+const SESSIONS=CUBE.sessions||[], nSess=SESSIONS.length;
+// Non-empty only when each account has its own transcripts directory, so the
+// split is measured. Shared-config installs get [] and no account facet.
+const ACCTS=CUBE.accounts||[], nAcct=ACCTS.length, SPLIT=nAcct>1;
+const lastDate=CUBE.days[nDays-1];
+
+/* from/to are the single source of truth for the date range; preset only
+   drives which button is highlighted, and is never consulted when filtering. */
+const F={gran:"day",from:"",to:"",preset:"all",
+  proj:new Set(CUBE.projects.map((_,i)=>i)),
+  model:new Set(CUBE.models.map((_,i)=>i)),
+  eff:new Set(CUBE.efforts.map((_,i)=>i)),
+  acct:new Set(ACCTS.map((_,i)=>i)),
+  // Deliberately unlike the dimensions above, where a FULL set means "not
+  // filtered": with 100+ sessions a full set is wasteful, and focusing is
+  // always deliberate. Empty means no session filter.
+  sess:new Set()};
+
+// A record with no sessionId carries -1, which no filter can match -- so an
+// active session filter correctly excludes unattributed rows.
+const passSess=si=>!F.sess.size||F.sess.has(si);
+const sessOn=i=>F.sess.has(i);
+
+/* ---- static header ---- */
+(function(){
+  const span=CUBE.span, days=(new Date(span[1])-new Date(span[0]))/864e5+1;
+  $("subline").textContent=`${span[0]} \u2192 ${span[1]} \u00b7 ${Math.round(days)} days \u00b7 every directory Claude Code ran in on this machine.`;
+  const tot=CUBE.facts.reduce((a,r)=>a+r[T_TOK],0), calls=CUBE.facts.reduce((a,r)=>a+r[T_CALLS],0);
+  $("meta").innerHTML=`generated ${CUBE.generated.slice(0,16).replace("T"," ")}<br>${CUBE.tz}<br>${calls.toLocaleString()} calls \u00b7 ${(tot/1e9).toFixed(2)}B`;
+})();
+
+
+/* ---- section routing ----
+   Panels carry data-sec; the rail switches which set is mounted. Keeps the
+   whole page in one document (so filters stay global and cross-filtering still
+   works) while ending the 6000px scroll. The choice is persisted so the
+   periodic auto-reload doesn't bounce you back to Overview. */
+const SECTIONS={now:"Overview",usage:"Usage",patterns:"Patterns",tooling:"Tooling",limits:"Limits",help:"Help"};
+const _SKEY="cud_section_v1";
+function showSection(sec){
+  if(!SECTIONS[sec]) sec="now";
+  document.querySelectorAll(".wrap [data-sec]").forEach(el=>{
+    el.classList.toggle("sec-off",el.dataset.sec!==sec);
+  });
+  document.querySelectorAll("#nav button").forEach(b=>{
+    const on=b.dataset.sec===sec;
+    b.classList.toggle("on",on); b.setAttribute("aria-selected",String(on));
+  });
+  $("secTitle").textContent=SECTIONS[sec];
+  // the span/filters caption describes the data, which Help isn't
+  $("subline").hidden=(sec==="help");
+  try{localStorage.setItem(_SKEY,sec);}catch(e){}
+  window.scrollTo(0,0);
+}
+$("nav").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-sec]"); if(b) showSection(b.dataset.sec);
+});
+
+/* ---- date helpers ----
+   These dates are calendar days in the user's timezone, never instants, so they
+   are formatted from the local fields. toISOString() was used here before: it
+   converts to UTC, which rolled every date back a day anywhere east of
+   Greenwich -- "7d" quietly spanned 8 days and week buckets started on Sunday
+   while being labelled with Monday's date. */
+const ymd=DL.ymd, today=()=>DL.ymd(new Date());
+const inDay=d=>DL.inSpan(d,F.from,F.to);
+
+/* Bound the pickers to the data (plus today, which may be past the last
+   recorded day) so the calendar cannot wander into empty years. Must sit
+   below `today`, not up with the header block -- const is not hoisted. */
+(function(){
+  const lo=CUBE.span[0], hi=today()>CUBE.span[1]?today():CUBE.span[1];
+  ["dFrom","dTo"].forEach(id=>{$(id).min=lo;$(id).max=hi;});
+})();
+function bucketOf(dateStr){
+  if(F.gran==="month")return dateStr.slice(0,7);
+  if(F.gran==="week"){
+    const d=new Date(dateStr+"T00:00:00");
+    const dow=(d.getDay()+6)%7;           // Monday=0
+    d.setDate(d.getDate()-dow);
+    return ymd(d);
+  }
+  return dateStr;
+}
+function bucketLabel(key){
+  if(F.gran==="month"){const[y,m]=key.split("-");
+    return ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][+m-1]+" "+y.slice(2);}
+  if(F.gran==="week")return "wk "+key.slice(5);
+  return key.slice(5);
+}
+function bucketSpan(){        // ordered bucket keys covering the active range
+  const start=F.from||CUBE.span[0], end=F.to||CUBE.span[1];
+  const keys=[], seen=new Set();
+  const d=new Date(start+"T00:00:00"), e=new Date(end+"T00:00:00");
+  for(;d<=e;d.setDate(d.getDate()+1)){
+    const k=bucketOf(ymd(d));
+    if(!seen.has(k)){seen.add(k);keys.push(k);}
+  }
+  return keys;
+}
+
+/* ---- the aggregation engine: one pass, cross-filtered ---- */
+function recompute(){
+  const passDate=r=>inDay(CUBE.days[r[D_DAY]]);
+  const passProj=r=>F.proj.has(r[D_PROJ]);
+  const passModel=r=>F.model.has(r[D_MODEL]);
+  const passEff=r=>F.eff.has(r[D_EFF]);
+  const passAcct=r=>!SPLIT||F.acct.has(r[D_ACCT]);
+  const passSs=r=>passSess(r[D_SESS]);
+
+  const buckets=bucketSpan();
+  const bIdx={}; buckets.forEach((k,i)=>bIdx[k]=i);
+  const tl=buckets.map(()=>new Array(nModel).fill(0));   // timeline: bucket x model
+  const projAgg=new Array(nProj).fill(0);
+  const modelAgg=new Array(nModel).fill(0);
+  const effAgg=new Array(nEff).fill(0);
+  const acctAgg=new Array(Math.max(nAcct,1)).fill(0);
+  const hourAgg=new Array(24).fill(0);
+  const heat=Array.from({length:7},()=>new Array(24).fill(0));  // dow x hour
+  const dayAgg={};                                              // exact per-day totals
+  const cacheB=buckets.map(()=>[0,0]);                          // per bucket: [cacheRead, cacheWrite]
+  let tok=0,cr=0,cw=0,out=0,calls=0;
+
+  for(const r of CUBE.facts){
+    const pd=passDate(r),pp=passProj(r),pm=passModel(r),pe=passEff(r),pa=passAcct(r),ps=passSs(r);
+    if(pd&&pp&&pm&&pe&&pa&&ps){
+      tok+=r[T_TOK];cr+=r[T_CR];cw+=r[T_CW];out+=r[T_OUT];calls+=r[T_CALLS];
+      const bk=bIdx[bucketOf(CUBE.days[r[D_DAY]])];
+      if(bk!==undefined){tl[bk][r[D_MODEL]]+=r[T_TOK];
+        cacheB[bk][0]+=r[T_CR];cacheB[bk][1]+=r[T_CW];}
+      hourAgg[r[D_HOUR]]+=r[T_TOK];
+      const dstr=CUBE.days[r[D_DAY]];
+      const dow=(new Date(dstr+"T00:00:00").getDay()+6)%7;  // Mon=0
+      heat[dow][r[D_HOUR]]+=r[T_TOK];
+      let da=dayAgg[dstr];
+      if(!da)da=dayAgg[dstr]={tok:0,cr:0,cw:0,calls:0,m:new Array(nModel).fill(0)};
+      da.tok+=r[T_TOK];da.cr+=r[T_CR];da.cw+=r[T_CW];da.calls+=r[T_CALLS];da.m[r[D_MODEL]]+=r[T_TOK];
+    }
+    if(pd&&pm&&pe&&pa&&ps)      projAgg[r[D_PROJ]]+=r[T_TOK];     // exclude project filter
+    if(pd&&pp&&pe&&pa&&ps)      modelAgg[r[D_MODEL]]+=r[T_TOK];   // exclude model filter
+    if(pd&&pp&&pm&&pa&&ps)      effAgg[r[D_EFF]]+=r[T_TOK];       // exclude effort filter
+    if(pd&&pp&&pm&&pe&&ps&&SPLIT) acctAgg[r[D_ACCT]]+=r[T_TOK];   // exclude account filter
+  }
+
+  const inRange=s=>{
+    if(SPLIT&&s.acct&&!F.acct.has(ACCTS.indexOf(s.acct)))return false;
+    if(F.sess.size&&!F.sess.has(CUBE.sessions.indexOf(s.session||"")))return false;
+    return inDay(s.day)&&F.proj.has(CUBE.projects.indexOf(s.dir));};
+  const incid=CUBE.switches.filter(inRange);
+
+  render({tok,cr,cw,out,calls,buckets,tl,cacheB,projAgg,modelAgg,effAgg,acctAgg,hourAgg,heat,dayAgg,incid});
+  syncControls();
+}
+
+/* ---- renderers ---- */
+function render(A){
+  /* KPIs */
+  const reuse=A.cw?A.cr/A.cw:0, cachedShare=A.tok?A.cr/A.tok*100:0;
+  const wk=A.incid.filter(s=>s.kind==="weekly").length;
+  const ses=A.incid.length-wk;
+  let topM=-1,topV=-1; A.modelAgg.forEach((v,i)=>{if(v>topV){topV=v;topM=i;}});
+  const topShare=A.tok?Math.round((A.modelAgg[topM]||0)/A.tok*100):0;
+  const kpis=[
+    ["Tokens",(A.tok/1e9>=1?(A.tok/1e9).toFixed(2)+"B":fmt(A.tok)),`${A.buckets.length} ${F.gran} buckets`,""],
+    ["API calls",A.calls.toLocaleString(),`${fmt(A.tok/(A.calls||1))} avg / call`,""],
+    ["Cache reuse",reuse?reuse.toFixed(1)+"\u00d7":"\u2014","each cached token re-read","good"],
+    ["Cached share",cachedShare?cachedShare.toFixed(1)+"%":"\u2014","of tokens re-read","good"],
+    ["Limit hits",String(A.incid.length),`${ses} session, ${wk} weekly`,"warn"],
+    ["Top model",topV>0?mName(CUBE.models[topM])+" "+topShare+"%":"\u2014","of tokens in view","accent"]];
+  $("kpis").innerHTML=kpis.map(k=>`<div class="kpi ${k[3]}"><div class="label">${k[0]}</div><div class="val">${k[1]}</div><div class="note">${k[2]}</div></div>`).join("");
+
+  /* timeline */
+  $("tl-desc").innerHTML=`Tokens per <b>${F.gran}</b> (IST), stacked by model. Ticks below the axis mark <b>limit hits</b> (session / weekly).`;
+  drawTimeline(A);
+
+  /* legend chips (model filter) */
+  $("tl-legend").innerHTML=CUBE.models.map((k,i)=>{
+    const off=!F.model.has(i)?" off":"";
+    return `<button type="button" data-mi="${i}" class="mchip${off}"><i class="sw" style="background:${mColor(k)}"></i>${mName(k)}</button>`;
+  }).join("")+
+   `<span class="static"><i class="sw" style="background:transparent;border:1.5px solid var(--warn)"></i>session limit</span>`+
+   `<span class="static"><i class="sw" style="background:transparent;border:1.5px solid var(--crit)"></i>weekly limit</span>`;
+
+  /* account bars -- only when the split is real */
+  if(SPLIT){
+    $("acctPanel").hidden=false;
+    drawBars($("accounts"),
+      ACCTS.map((a,i)=>({i,name:a,v:A.acctAgg[i],on:F.acct.has(i)})).sort((a,b)=>b.v-a.v),
+      ()=>"var(--accent-2)","acct",false,A.tok);
+  }
+
+  /* project bars (click to filter) */
+  drawBars($("projects"),
+    CUBE.projects.map((p,i)=>({i,name:shortPath(proj(p),30),v:A.projAgg[i],on:F.proj.has(i)}))
+      .filter(x=>x.v>0||!x.on).sort((a,b)=>b.v-a.v).slice(0,10),
+    ()=>"var(--ink-faint)","proj",true,A.tok);
+
+  /* model bars */
+  drawBars($("models"),
+    CUBE.models.map((m,i)=>({i,name:mName(m),v:A.modelAgg[i],on:F.model.has(i),k:m}))
+      .sort((a,b)=>b.v-a.v),
+    x=>mColor(x.k),"model",true,A.tok);
+
+  /* effort bars */
+  const effOrder={max:0,xhigh:1,high:2,unset:3};
+  drawBars($("effort"),
+    CUBE.efforts.map((e,i)=>({i,name:e==="unset"?"unset / n\u00b7a":e,v:A.effAgg[i],on:F.eff.has(i),raw:e}))
+      .sort((a,b)=>(effOrder[a.raw]??9)-(effOrder[b.raw]??9)),
+    x=>x.raw==="unset"?"var(--ink-faint)":"var(--accent)","eff",false,A.tok);
+
+  drawCache(A);
+  drawHours(A.hourAgg);
+  drawHeatmap(A.heat);
+  drawDaily(A.dayAgg,A.incid);
+
+  /* incidents: plain record of when a wall was hit (wk/ses from KPI block above) */
+  $("inc-desc").innerHTML=A.incid.length
+    ? `Newest first. <b>${ses}</b> session (5-hour) and <b>${wk}</b> weekly limit hits in this view &mdash; when work hit a wall, on whichever account was active.`
+    : `No limit hits in this view.`;
+  $("incidents").innerHTML=A.incid.length? [...A.incid].reverse().map(s=>
+    `<tr><td>${s.ist}</td><td><span class="chip ${s.kind}">${s.kind}</span></td>`+
+    `<td style="color:var(--ink-soft)">${proj(s.dir)}</td></tr>`
+  ).join(""):`<tr><td colspan="3" class="empty">No limit hits in this view.</td></tr>`;
+
+  // Tooling follows the date filter too, so every section moves together.
+  LAST_A=A;
+  if(typeof drawAttr==="function"){ drawAttr(attrKind); drawDeleg(); }
+}
+let LAST_A=null, attrKind="tools";
+
+/* Horizontal bar list. The value sits immediately after the bar's end rather
+   than pinned to the far right, so the eye never crosses an empty track.
+   `log` switches to a log scale \u2014 needed wherever the spread is extreme
+   (model volume runs from 2.6B down to 716K, four orders of magnitude; on a
+   linear scale everything below the leader is an invisible sliver). */
+// share of a total, kept honest at the small end: 0.04% reads as "<0.1%",
+// never as a rounded-down "0.0%" that looks like nothing at all.
+const pct=(v,den)=>{
+  if(!den||v<=0)return "\u2014";
+  const p=v/den*100;
+  return p<0.1?"<0.1%":p.toFixed(1)+"%";
+};
+function drawBars(el,items,colorFn,kind,log,den,denLabel){
+  if(!items.length){el.innerHTML=`<div class="empty">Nothing in view.</div>`;return;}
+  const max=Math.max(1,...items.map(x=>x.v));
+  const pos=items.filter(x=>x.v>0).map(x=>x.v);
+  const min=pos.length?Math.min(...pos):1;
+  const decades=Math.log10(max/Math.max(min,1));
+  const useLog=log&&decades>=2;                    // only when it actually earns it
+  const lo=Math.log10(Math.max(min,1))-0.35;
+  const width=v=>{
+    if(v<=0)return 0;
+    if(!useLog)return Math.max(1.2,v/max*100);
+    return Math.max(2,(Math.log10(v)-lo)/(Math.log10(max)-lo)*100);
+  };
+  const cls=den?" p1":"";
+  const head=den?`<div class="rowhead p1"><span></span><span></span><span>tokens</span>`+
+    `<span class="r">${denLabel||"view"}</span></div>`:"";
+  el.innerHTML=head+items.map(x=>
+    `<div class="row click${cls} ${x.on?"":"off"}" data-kind="${kind}" data-i="${x.i}" role="button" tabindex="0" aria-pressed="${x.on}">`+
+    `<div class="name" title="${x.name}">${x.name}</div>`+
+    `<div class="track"><div class="fill" style="width:${width(x.v)}%;background:${colorFn(x)}"></div></div>`+
+    `<div class="amt">${x.v>0?fmt(x.v):"\u2014"}</div>`+
+    (den?`<div class="pct">${pct(x.v,den)}</div>`:"")+
+    `</div>`).join("")
+    +(useLog?`<div class="empty" style="padding:8px 2px 0">log scale \u00b7 ${Math.round(decades)} orders of magnitude between top and bottom</div>`:"");
+}
+
+function drawTimeline(A){
+  const buckets=A.buckets, n=buckets.length;
+  const max=Math.max(1,...A.tl.map(row=>row.reduce((a,b)=>a+b,0)));
+  const cw=n<=3?90:n<=8?58:n<=16?38:26, gap=Math.max(4,cw*0.24);
+  const padL=46,padT=10,H=210,padB=44, W=padL+n*(cw+gap);
+  const y=v=>padT+(H-padT)*(1-v/max);
+  let s=`<svg viewBox="0 0 ${W} ${H+padB}" style="max-width:${W}px" role="img" aria-label="Tokens per ${F.gran} by model">`;
+  for(let i=0;i<=4;i++){const gv=max*i/4,gy=y(gv);
+    s+=`<line class="grid-line" x1="${padL}" x2="${W}" y1="${gy}" y2="${gy}"/>`;
+    s+=`<text x="${padL-8}" y="${gy+3}" font-size="9.5" text-anchor="end">${fmt(gv)}</text>`;}
+  const incBy={};
+  A.incid.forEach(sw=>{const bk=bucketOf(sw.day);(incBy[bk]=incBy[bk]||[]).push(sw);});
+  buckets.forEach((bk,i)=>{
+    const x=padL+i*(cw+gap); let acc=H;
+    CUBE.models.forEach((m,mi)=>{const v=A.tl[i][mi];if(!v)return;
+      const h=(H-padT)*v/max;acc-=h;
+      s+=`<rect fill="${mGrad(m)}" x="${x}" y="${acc}" width="${cw}" height="${h}" rx="2.5"><title>${bucketLabel(bk)} \u00b7 ${mName(m)} \u00b7 ${fmt(v)}</title></rect>`;});
+    const showLabel=n<=16||i%Math.ceil(n/16)===0;
+    if(showLabel)s+=`<text x="${x+cw/2}" y="${H+14}" font-size="9" text-anchor="middle">${bucketLabel(bk)}</text>`;
+    (incBy[bk]||[]).forEach((sw,j)=>{const col=sw.kind==="weekly"?"var(--crit)":"var(--warn)";const ty=H+26+j*7;
+      const cx=x+cw/2;
+      s+=`<circle cx="${cx}" cy="${ty}" r="2.6" fill="${col}"><title>${sw.ist} ${sw.kind} limit</title></circle>`;});
+  });
+  s+=`</svg>`;
+  $("timeline").innerHTML=s;
+}
+
+function drawHours(vals){
+  const H=148,padT=8,max=Math.max(1,...vals),W=640,padL=4,n=24,bw=(W-padL)/n;
+  let s=`<svg viewBox="0 0 ${W} ${H+22}" role="img" aria-label="Tokens by hour of day">`;
+  vals.forEach((v,h)=>{const bh=(H-padT)*v/max,x=padL+h*bw+2,y=H-bh,peak=v===max&&v>0;
+    s+=`<rect x="${x}" y="${y}" width="${bw-4}" height="${bh}" rx="3" fill="var(--heat4)" opacity="${peak?1:.55}"><title>${h}:00 IST \u00b7 ${fmt(v)}</title></rect>`;
+    if(h%3===0)s+=`<text x="${x+(bw-4)/2}" y="${H+13}" font-size="9" text-anchor="middle">${h}</text>`;});
+  s+=`</svg>`; $("hours").innerHTML=s;
+}
+
+/* ---- cache economics ----
+   Output tokens were folded invisibly into the total until the cube carried
+   them; with T_OUT, fresh input is the remainder and the split is real. */
+function drawCache(A){
+  const s=DL.cacheSplit({tok:A.tok,cr:A.cr,cw:A.cw,out:A.out});
+  const bands=[
+    ["cache read", s.read, s.pct.read, "var(--accent)"],
+    ["cache write", s.write, s.pct.write, "var(--warn)"],
+    ["output", s.out, s.pct.out, "var(--m-opus)"],
+    ["fresh input", s.fresh, s.pct.fresh, "var(--ink-faint)"]];
+  // A band under ~8% cannot hold its own label legibly, so the bar labels only
+  // what it has room for and the key below carries every figure.
+  $("cacheSplit").innerHTML=
+    (s.total?`<div class="cachesplit">`+bands.filter(b=>b[1]>0).map(b=>
+      `<div style="width:${b[2]}%;background:${b[3]}" title="${b[0]} ${fmt(b[1])}">`+
+      `${b[2]>=8?b[2].toFixed(1)+"%":""}</div>`).join("")+`</div>`
+     :`<div class="empty">Nothing in view.</div>`)+
+    `<div class="cachekey">`+bands.map(b=>
+      `<span><i style="background:${b[3]}"></i>${b[0]} <b>${fmt(b[1])}</b> `+
+      `(${b[2].toFixed(1)}%)</span>`).join("")+`</div>`;
+  $("cacheVerdict").textContent=DL.cacheVerdict({cr:A.cr,cw:A.cw,readPct:s.pct.read});
+  $("cacheGran").textContent=F.gran;
+
+  /* reuse trend, one bar per bucket */
+  const n=A.buckets.length;
+  if(!n){$("cacheTrend").innerHTML=`<div class="empty">No buckets in range.</div>`;return;}
+  const vals=A.cacheB.map(([r,w])=>w?r/w:0);
+  const max=Math.max(1,...vals);
+  const bw=Math.max(6,Math.min(26,600/n-4)),gap=Math.max(2,bw*0.24),padL=40,H=90,padT=6;
+  const W=padL+n*(bw+gap);
+  let g=`<svg viewBox="0 0 ${W} ${H+18}" style="max-width:${W}px" role="img" aria-label="Cache reuse per bucket">`;
+  A.buckets.forEach((k,i)=>{const x=padL+i*(bw+gap),v=vals[i];
+    const h=(H-padT)*v/max;
+    g+=`<rect x="${x}" y="${H-h}" width="${bw}" height="${h}" rx="1.5" fill="var(--accent)">`+
+       `<title>${bucketLabel(k)} \u00b7 ${v?v.toFixed(1)+"\u00d7":"no writes"}</title></rect>`;
+    if(i===0||i===n-1)g+=`<text x="${x}" y="${H+12}" font-size="8.5" fill="var(--ink-faint)">${bucketLabel(k)}</text>`;});
+  g+=`<text x="0" y="12" font-size="8.5" fill="var(--ink-faint)">${max.toFixed(0)}\u00d7</text>`;
+  g+=`</svg>`;$("cacheTrend").innerHTML=g;
+}
+
+function drawHeatmap(heat){
+  const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const max=Math.max(1,...heat.flat());
+  /* Activity is heavily skewed -- a couple of hours dwarf the rest, so binning
+     by value puts almost every cell in the same low step and the weekly shape
+     disappears. Bin by rank instead: each step holds a similar number of cells,
+     which is what makes the pattern legible. */
+  const nz=heat.flat().filter(v=>v>0).sort((a,b)=>a-b);
+  const cuts=[];
+  for(let k=1;k<6;k++) cuts.push(nz.length?nz[Math.floor(k/6*(nz.length-1))]:0);
+  const stepOf=v=>{ if(!v) return 0; let k=1; while(k<6&&v>cuts[k-1]) k++; return k; };
+  const padL=34,padT=4,cell=26,gapc=3,rows=7,cols=24;
+  const W=padL+cols*(cell+gapc), H=padT+rows*(cell+gapc)+16;
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Tokens by weekday and hour">`;
+  for(let h=0;h<cols;h++) if(h%3===0)
+    s+=`<text class="heat-lab" x="${padL+h*(cell+gapc)+cell/2}" y="${padT+rows*(cell+gapc)+11}" text-anchor="middle">${h}</text>`;
+  heat.forEach((row,dw)=>{
+    s+=`<text class="heat-lab" x="${padL-6}" y="${padT+dw*(cell+gapc)+cell/2+3}" text-anchor="end">${DOW[dw]}</text>`;
+    row.forEach((v,h)=>{
+      const x=padL+h*(cell+gapc), y=padT+dw*(cell+gapc);
+      // Single-hue sequential ramp, discrete rank-based steps (see above).
+      const step=stepOf(v);
+      s+=`<rect class="heatcell" x="${x}" y="${y}" width="${cell}" height="${cell}" rx="3" fill="var(--heat${step})"><title>${DOW[dw]} ${h}:00 \u00b7 ${fmt(v)}</title></rect>`;
+    });
+  });
+  s+=`</svg>`; $("heatmap").innerHTML=s;
+}
+
+function drawDaily(dayAgg,incid){
+  const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+  const days=Object.keys(dayAgg).sort();               // ascending for stats
+  const limByDay={};
+  incid.forEach(s=>{(limByDay[s.day]=limByDay[s.day]||[]).push(s);});
+  if(!days.length){$("dailyRows").innerHTML=`<tr><td colspan="8" class="empty">No days in view.</td></tr>`;
+    $("daily-desc").textContent="";return;}
+  const total=days.reduce((a,d)=>a+dayAgg[d].tok,0);
+  const max=Math.max(...days.map(d=>dayAgg[d].tok));
+  const busiest=days.reduce((a,d)=>dayAgg[d].tok>dayAgg[a].tok?d:a,days[0]);
+  $("daily-desc").innerHTML=`<b>${days.length}</b> active days &middot; avg <b>${fmt(total/days.length)}</b>/day `+
+    `&middot; busiest <b>${busiest.slice(5)}</b> (${fmt(dayAgg[busiest].tok)}). Follows the date / model / project filters.`;
+  $("dailyRows").innerHTML=[...days].reverse().map(d=>{
+    const da=dayAgg[d];
+    const dow=DOW[(new Date(d+"T00:00:00").getDay()+6)%7];
+    let tm=0; da.m.forEach((v,i)=>{if(v>da.m[tm])tm=i;});
+    const topModel=da.tok?`<span style="color:${mColor(CUBE.models[tm])}">${mName(CUBE.models[tm])}</span>`:"\u2014";
+    const reuse=da.cw?(da.cr/da.cw).toFixed(0)+"\u00d7":"\u2014";
+    const lim=(limByDay[d]||[]).map(s=>
+      `<span class="chip ${s.kind}" title="${s.ist} ${s.kind} limit">${s.kind}</span>`
+    ).join(" ")||"";
+    return `<tr><td style="white-space:nowrap">${d}</td><td class="dow">${dow}</td>`+
+      `<td class="num">${da.tok.toLocaleString()}</td>`+
+      `<td><div class="minibar"><i style="width:${Math.max(2,da.tok/max*100)}%"></i></div></td>`+
+      `<td class="num">${da.calls.toLocaleString()}</td>`+
+      `<td class="num">${reuse}</td>`+
+      `<td>${topModel}</td><td>${lim}</td></tr>`;
+  }).join("");
+}
+
+/* ---- controls ---- */
+// Names as the chips show them. Kept in one place so the renderer and the
+// click handler can never disagree about what a chip's id means.
+const CHIP_NAMES={
+  proj:()=>CUBE.projects.map(p=>shortPath(proj(p),28)),
+  model:()=>CUBE.models.map(mName),
+  eff:()=>CUBE.efforts.slice(),
+  acct:()=>ACCTS.slice()};
+function chipSpecs(){
+  const out=[];
+  const r=DL.rangeChip(F.from,F.to); if(r)out.push({dim:"range",...r});
+  // total:Infinity is what makes "empty = no filter" work here -- a non-empty
+  // selection can never reach the total, so it always produces chips.
+  DL.dimChips({kind:"sessions",names:[...F.sess].map(i=>CUBE.sessions[i]),
+    total:Infinity,cap:6,mode:"list"})
+    .forEach(c=>out.push({dim:"sess",...c,
+      text:c.id==="+"?c.text:"session "+c.text.slice(0,8)}));
+  const dim=(kind,set,label,cap,mode)=>{
+    const arr=CHIP_NAMES[kind]();
+    DL.dimChips({kind:label,names:[...set].map(i=>arr[i]),total:arr.length,cap,mode})
+      .forEach(c=>out.push({dim:kind,...c}));};
+  dim("proj",F.proj,"workspaces",6,"list");
+  dim("model",F.model,"models",3,"summary");
+  dim("eff",F.eff,"effort",3,"summary");
+  if(SPLIT)dim("acct",F.acct,"accounts",3,"summary");
+  return out;
+}
+function syncControls(){
+  const specs=chipSpecs();
+  $("filterChips").innerHTML=specs.length
+    ?`<span class="lead">Filtered</span>`+specs.map(c=>c.id==="+"
+      ?`<span class="fchip static">${c.text}</span>`
+      :`<button type="button" class="fchip" data-dim="${c.dim}" data-id="${c.id}" `+
+       `title="Clear this filter"><span class="t">${c.text}</span><span class="x">\u00d7</span></button>`).join("")
+    :`<span class="none">showing everything</span>`;
+  saveFilters();
+}
+// Clearing a chip restores that dimension only. The range clears to All.
+$("filterChips").addEventListener("click",e=>{
+  const b=e.target.closest("button.fchip"); if(!b)return;
+  const dim=b.dataset.dim, id=b.dataset.id;
+  if(dim==="range"){F.from="";F.to="";F.preset="all";paintRange();}
+  else if(dim==="sess"){
+    if(id==="*")F.sess.clear();
+    else{const i=CUBE.sessions.indexOf(id); if(i>=0)F.sess.delete(i);}
+  }
+  else{
+    const arr=CHIP_NAMES[dim](), set=F[dim];
+    if(id==="*")for(let j=0;j<arr.length;j++)set.add(j);
+    else{const i=arr.indexOf(id); if(i>=0)F[dim]=DL.toggleFocus(set,i,arr.length);}
+  }
+  recompute();});
+function segWire(id,key){
+  $(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+    F[key]=b.dataset.v;
+    [...e.currentTarget.children].forEach(c=>c.classList.toggle("on",c===b));
+    recompute();});
+}
+function focusSet(set,i,total){
+  // click to isolate one item; click the sole survivor again to restore all.
+  const all=()=>{set.clear();for(let j=0;j<total;j++)set.add(j);};
+  if(set.size===1&&set.has(i))all();
+  else{set.clear();set.add(i);}
+}
+segWire("segGran","gran");
+
+function paintRange(){
+  $("dFrom").value=F.from; $("dTo").value=F.to;
+  [...$("segRange").children].forEach(c=>c.classList.toggle("on",c.dataset.v===F.preset));
+}
+$("segRange").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  F.preset=b.dataset.v;
+  const s=DL.presetSpan(F.preset,today());
+  F.from=s.from; F.to=s.to;
+  paintRange(); recompute();});
+// Clicking anywhere in the field opens the calendar, not just the small icon.
+// showPicker throws without a user gesture and is absent on older browsers, so
+// failing here must leave normal typing untouched.
+["dFrom","dTo"].forEach(id=>$(id).addEventListener("click",e=>{
+  try{ e.currentTarget.showPicker(); }catch(err){}
+}));
+// Typing a date drops the preset highlight -- from/to are what actually filter.
+["dFrom","dTo"].forEach(id=>$(id).addEventListener("change",()=>{
+  const s=DL.normSpan($("dFrom").value,$("dTo").value);
+  F.from=s.from; F.to=s.to;
+  F.preset=DL.matchPreset(F.from,F.to,today());
+  paintRange(); recompute();}));
+
+$("resetBtn").addEventListener("click",()=>{
+  F.gran="day";F.preset="all";F.from="";F.to="";
+  F.proj=new Set(CUBE.projects.map((_,i)=>i));
+  F.model=new Set(CUBE.models.map((_,i)=>i));
+  F.eff=new Set(CUBE.efforts.map((_,i)=>i));
+  F.acct=new Set(ACCTS.map((_,i)=>i));
+  F.sess.clear();
+  [...$("segGran").children].forEach(c=>c.classList.toggle("on",c.dataset.v==="day"));
+  paintRange(); recompute();});
+/* legend model toggles */
+$("tl-legend").addEventListener("click",e=>{const b=e.target.closest("button[data-mi]");if(!b)return;
+  focusSet(F.model,+b.dataset.mi,nModel);recompute();});
+/* bar clicks (project / model / effort) */
+function barHandler(e){const row=e.target.closest(".row.click");if(!row)return;
+  const i=+row.dataset.i,kind=row.dataset.kind;
+  const set={proj:F.proj,model:F.model,eff:F.eff,acct:F.acct}[kind];
+  const tot={proj:nProj,model:nModel,eff:nEff,acct:nAcct}[kind];
+  focusSet(set,i,tot);
+  recompute();}
+["projects","models","effort","accounts"].forEach(id=>{
+  $(id).addEventListener("click",barHandler);
+  $(id).addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();barHandler(e);}});});
+
+/* theme */
+/* Theme choice is persisted: the page reloads itself on a timer, and without
+   this the toggle was silently undone every refresh. */
+const _TKEY="cud_theme_v1";
+(function(){let t=null;try{t=localStorage.getItem(_TKEY);}catch(e){}
+  if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t);})();
+$("themeBtn").addEventListener("click",()=>{const root=document.documentElement;
+  const cur=root.getAttribute("data-theme")||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+  const next=cur==="dark"?"light":"dark";
+  root.setAttribute("data-theme",next);
+  try{localStorage.setItem(_TKEY,next);}catch(e){}});
+
+/* ---- hover cards ----
+   One element, populated from data-hc-* attributes on hover or keyboard focus,
+   flipped when it would leave the viewport. The rows carry no title=, so the
+   OS tooltip never competes with this. */
+(function(){
+  const card=$("hcard"); let hideT=null;
+  const place=(x,y)=>{
+    const r=card.getBoundingClientRect(), pad=12;
+    let left=x+16, top=y+16;
+    if(left+r.width>innerWidth-pad)left=Math.max(pad,x-r.width-16);
+    if(top+r.height>innerHeight-pad)top=Math.max(pad,y-r.height-16);
+    card.style.left=left+"px"; card.style.top=top+"px";
+  };
+  const show=(el,x,y)=>{
+    clearTimeout(hideT);
+    const title=el.dataset.hcTitle||"", tag=el.dataset.hcTag||"";
+    const body=el.dataset.hcBody||"", stats=el.dataset.hcStats||"";
+    card.innerHTML=`<div class="hc-h"><span class="hc-t">${title}</span>`+
+      (tag?`<span class="hc-tag">${tag}</span>`:"")+`</div>`+
+      (body?`<div class="hc-b">${body}</div>`:"")+
+      (stats?`<div class="hc-s">${stats}</div>`:"");
+    card.hidden=false; card.setAttribute("aria-hidden","false");
+    place(x,y); card.classList.add("show");
+  };
+  const hide=()=>{card.classList.remove("show");card.setAttribute("aria-hidden","true");
+    hideT=setTimeout(()=>{card.hidden=true;},140);};
+  document.addEventListener("mousemove",e=>{
+    const el=e.target.closest("[data-hc]");
+    if(!el){if(!card.hidden)hide();return;}
+    show(el,e.clientX,e.clientY);
+  });
+  document.addEventListener("focusin",e=>{
+    const el=e.target.closest("[data-hc]"); if(!el){hide();return;}
+    const r=el.getBoundingClientRect(); show(el,r.left,r.bottom);
+  });
+  document.addEventListener("focusout",hide);
+  addEventListener("scroll",hide,true);
+  addEventListener("keydown",e=>{if(e.key==="Escape")hide();});
+})();
+
+/* ---- deep-dive (all-time, from CUBE.extras) ---- */
+const X=CUBE.extras;
+const ATTR={
+  tools:{items:X.tools, note:"one tool per turn, so tokens are exact", label:"tool", cat:"tools"},
+  mcp:{items:X.mcp, note:"tagged only inside an MCP call", label:"MCP server", cat:"servers"},
+  mcp_tools:{items:X.mcp_tools, note:"individual MCP tools", label:"MCP tool", cat:"mcp tools"},
+  skills:{items:X.skills, note:"tagged only inside a running skill", label:"skill", cat:"skills"},
+};
+function niceName(s){s=String(s);
+  if(s.startsWith("mcp__"))return s.slice(5).split("__").pop();   // browser_evaluate, tavily_search, exec
+  if(s.startsWith("plugin:"))return s.split(":").pop();           // playwright, chrome-devtools
+  if(s.startsWith("superpowers:"))return s.slice(12);             // executing-plans
+  return s;}
+/* Re-total an attribution list over the active filters using each entry's tail.
+   Tail row: [dayIdx, projIdx, sessIdx, tokens, cacheRead, cacheWrite, calls].
+   Returns [name, tokens, calls, tail, cacheRead, cacheWrite] -- the first four
+   positions are unchanged, so existing callers are unaffected. Entries that
+   fall entirely outside the filters drop out. */
+function attrInRange(list){
+  return (list||[]).map(x=>{
+    let t=0,c=0,cr=0,cw=0;
+    for(const row of (x[3]||[]))
+      if(inDay(CUBE.days[row[A_DAY]])&&F.proj.has(row[A_PROJ])&&passSess(row[A_SESS])){
+        t+=row[A_TOK];c+=row[A_CALLS];cr+=row[A_CR];cw+=row[A_CW];}
+    return [x[0],t,c,x[3],cr,cw];
+  }).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
+}
+function drawAttr(kind){
+  if(kind==="sessions"){ drawSessions(); return; }
+  if(kind==="workspaces"){ drawWorkspaces(); return; }
+  const cfg=ATTR[kind], items=attrInRange(cfg.items);
+  $("attrKind").textContent=cfg.label;
+  const covered=items.reduce((a,x)=>a+x[1],0);
+  // denominator must follow the same filter, or the share is meaningless
+  const denom=LAST_A&&LAST_A.tok?LAST_A.tok:X.total_tok;
+  $("attrNote").textContent=`${denom?(covered/denom*100).toFixed(1):"0.0"}% of tokens \u2014 ${cfg.note}`;
+  // Same treatment as the other bar lists: log scale when the spread is wide
+  // (Bash to Glob is ~2.5 decades), neutral ink because this is one series,
+  // and the value sits against the bar rather than at the panel edge.
+  const vals=items.map(x=>x[1]).filter(v=>v>0);
+  const max=Math.max(1,...vals), min=vals.length?Math.min(...vals):1;
+  const decades=Math.log10(max/Math.max(min,1));
+  const useLog=decades>=2, lo=Math.log10(Math.max(min,1))-0.35;
+  const width=v=>v<=0?0:useLog
+    ?Math.max(2,(Math.log10(v)-lo)/(Math.log10(max)-lo)*100)
+    :Math.max(1.2,v/max*100);
+  // Two denominators, because this category covers a slice rather than a
+  // partition: "of view" is the share of everything in the current date range,
+  // "of <category>" is the share within the category itself.
+  const head=`<div class="rowhead p3"><span>${cfg.label}</span><span></span>`+
+    `<span>tokens \u00b7 calls</span>`+
+    `<span class="r" data-hc tabindex="0" data-hc-title="view" data-hc-tag="column" `+
+    `data-hc-body="Share of every token in the current view &mdash; the date range plus any active filters.">view</span>`+
+    `<span class="r" data-hc tabindex="0" data-hc-title="${esc(cfg.cat)}" data-hc-tag="column" `+
+    `data-hc-body="Share within this category only. These categories cover a slice of your tokens rather than splitting them up, so one denominator is not enough &mdash; a tool can be 3% of everything and 20% of tool-attributed work.">${cfg.cat}</span>`+
+    `<span class="r" data-hc tabindex="0" data-hc-title="reuse" data-hc-tag="column" `+
+    `data-hc-body="How many times each cached token was read back, for the work this row covers. A low figure means context kept being rebuilt rather than re-read &mdash; cache writes cost far more than cache reads.">reuse</span></div>`;
+  // First and last day this entry appears on, under the active filters.
+  const firstLast=x=>{
+    const ds=(x[3]||[]).filter(row=>inDay(CUBE.days[row[A_DAY]])&&F.proj.has(row[A_PROJ])
+      &&passSess(row[A_SESS])).map(row=>CUBE.days[row[A_DAY]]);
+    if(!ds.length)return "";
+    ds.sort();
+    return ds[0]===ds[ds.length-1]?`<b>seen</b> ${ds[0]}`:`<b>seen</b> ${ds[0]} to ${ds[ds.length-1]}`;
+  };
+  const hc=x=>{
+    const d=DL.describe(x[0],kind);
+    const stats=[`<b>${fmt(x[1])}</b> tokens \u00b7 <b>${x[2].toLocaleString()}</b> calls`,
+      `${pct(x[1],denom)} of all tokens in view`,
+      `${pct(x[1],covered)} of ${cfg.cat}`,
+      `cache <b>${reuseTxt(x[4],x[5])}</b> reuse \u00b7 ${fmt(x[4])} read, ${fmt(x[5])} written`,
+      firstLast(x)].filter(Boolean).join("<br>");
+    return `data-hc data-hc-title="${esc(d.title)}" data-hc-tag="${esc(d.tag)}" `+
+           // stats carries deliberate <b>/<br> markup, so only the quotes that
+           // would end the attribute are escaped -- never the tags.
+           `data-hc-body="${esc(d.body)}" data-hc-stats="${escAttr(stats)}"`;
+  };
+  $("attrBars").innerHTML=items.length?head+`<div class="rows">`+items.map(x=>
+    `<div class="row p3" ${hc(x)} tabindex="0"><div class="name">${niceName(x[0])}</div>`+
+    `<div class="track"><div class="fill" style="width:${width(x[1])}%;background:var(--ink-faint)"></div></div>`+
+    `<div class="amt">${fmt(x[1])}<span style="color:var(--ink-faint)"> \u00b7 ${x[2].toLocaleString()}</span></div>`+
+    `<div class="pct">${pct(x[1],denom)}</div>`+
+    `<div class="pct dim">${pct(x[1],covered)}</div>`+
+    `<div class="pct dim">${reuseTxt(x[4],x[5])}</div></div>`
+  ).join("")+`</div>`
+   +(useLog?`<div class="empty" style="padding:8px 2px 0">log scale \u00b7 ${Math.round(decades)} orders of magnitude between top and bottom</div>`:"")
+   :`<div class="empty">Nothing tagged.</div>`;
+}
+
+/* ---- sessions: full, scrollable, sortable, focusable, with copy-to-resume ----
+   Identity (full id, last-used to the minute, directory) comes from
+   extras.sessions.all; every figure comes from the fact table, so this table
+   cross-filters like the rest of the page instead of following only the date.
+   Deliberately computed WITHOUT the session filter -- that is the cross-filtering
+   rule, and it is what lets you focus a second session once a first is focused. */
+let sessSort={key:"recent",dir:-1};   // default: most recent first
+function drawSessions(){
+  const meta=new Map((X.sessions.all||[]).map(r=>[r[0],r]));
+  const agg=CUBE.sessions.map(()=>({tok:0,calls:0,cr:0,cw:0}));
+  for(const r of CUBE.facts){
+    if(r[D_SESS]<0||!inDay(CUBE.days[r[D_DAY]]))continue;
+    if(!F.proj.has(r[D_PROJ])||!F.model.has(r[D_MODEL])||!F.eff.has(r[D_EFF]))continue;
+    if(SPLIT&&!F.acct.has(r[D_ACCT]))continue;
+    const a=agg[r[D_SESS]];
+    a.tok+=r[T_TOK];a.calls+=r[T_CALLS];a.cr+=r[T_CR];a.cw+=r[T_CW];
+  }
+  const all=CUBE.sessions.map((id,i)=>{
+    const m=meta.get(id);
+    return {i,id,last:(m&&m[3])||"",dir:(m&&m[4])||"",...agg[i]};
+  }).filter(x=>x.tok>0);
+  $("attrKind").textContent="session";
+  if(!all.length){
+    $("attrNote").textContent="no sessions in range";
+    $("attrBars").innerHTML=`<div class="empty">No sessions match the current filters.</div>`;
+    return;
+  }
+  const toks=all.map(x=>x.tok).sort((a,b)=>a-b);
+  const median=toks[Math.floor(toks.length/2)];
+  $("attrNote").textContent=`${all.length} session${all.length===1?"":"s"} \u00b7 median ${fmt(median)} tok \u00b7 largest ${fmt(toks[toks.length-1])}`;
+  const keyFn={recent:x=>x.last,workspace:x=>proj(x.dir),tokens:x=>x.tok,
+               calls:x=>x.calls,reuse:x=>x.cw?x.cr/x.cw:0}[sessSort.key];
+  all.sort((a,b)=>{const x=keyFn(a),y=keyFn(b);return (x>y?1:x<y?-1:0)*sessSort.dir;});
+  const maxTok=Math.max(1,...all.map(x=>x.tok));   // bars scaled to the biggest session
+  const arrow=k=>sessSort.key===k?(sessSort.dir<0?" \u25be":" \u25b4"):"";
+  const th=(k,label,cls)=>`<th data-sort="${k}" class="sortable ${cls||""}${sessSort.key===k?" active":""}">${label}${arrow(k)}</th>`;
+  const rows=all.map(x=>{
+    const when=x.last.replace("T"," "), w=Math.max(2,x.tok/maxTok*100), on=sessOn(x.i);
+    return `<tr class="${on?"focused":""}"><td class="sess-when">${when||"\u2014"}</td>`+
+      `<td class="sess-dir" title="${proj(x.dir)}">${proj(x.dir)}</td>`+
+      `<td class="sess-tok"><span class="track"><i style="width:${w}%"></i></span>`+
+      `<span class="tv">${fmt(x.tok)}</span></td>`+
+      `<td class="num">${x.calls.toLocaleString()}</td>`+
+      `<td class="num">${reuseTxt(x.cr,x.cw)}</td>`+
+      `<td class="sess-id" title="${x.id}">${x.id.slice(0,8)}</td>`+
+      `<td class="rowacts"><button class="copybtn focusbtn${on?" on":""}" data-focus="sess" `+
+      `data-i="${x.i}" type="button" title="Filter every panel to this session">`+
+      `${on?"focused":"focus"}</button>`+
+      `<button class="copybtn" data-id="${x.id}" type="button" `+
+      `title="Copy session id (claude --resume ${x.id})">copy</button></td></tr>`;
+  }).join("");
+  $("attrBars").innerHTML=`<div class="sesswrap"><table class="sesstable">`+
+    `<thead><tr>${th("recent","Last used")}${th("workspace","Workspace")}`+
+    `${th("tokens","Tokens")}${th("calls","Calls","r")}${th("reuse","Reuse","r")}`+
+    `<th>Session</th><th></th></tr></thead>`+
+    `<tbody>${rows}</tbody></table></div>`+
+    `<p class="sess-hint"><b>focus</b> filters every panel to a session &mdash; focus several to compare them, `+
+    `or click <b>focused</b> again to drop one. <b>Reuse</b> is how many times each cached token was re-read: `+
+    `a low figure means that session kept rebuilding its context. <b>copy</b> puts the id on your clipboard, `+
+    `to resume with <code>claude --resume &lt;id&gt;</code>. Sort by any header.</p>`;
+}
+
+/* ---- workspaces: every directory, not the top ten the bar panel shows ----
+   Cross-filtered: computed with every filter EXCEPT the project one, so you can
+   always see what else there is to switch to. Shares F.proj with the bars in
+   "Where the tokens go", so a bar click and a focus button are the same action. */
+let wsSort={key:"tokens",dir:-1};
+function drawWorkspaces(){
+  const agg=CUBE.projects.map(()=>({tok:0,calls:0,cr:0,cw:0,last:"",sess:new Set()}));
+  for(const r of CUBE.facts){
+    if(!inDay(CUBE.days[r[D_DAY]]))continue;
+    if(!F.model.has(r[D_MODEL])||!F.eff.has(r[D_EFF]))continue;
+    if(SPLIT&&!F.acct.has(r[D_ACCT]))continue;
+    if(!passSess(r[D_SESS]))continue;
+    const a=agg[r[D_PROJ]];
+    a.tok+=r[T_TOK];a.calls+=r[T_CALLS];a.cr+=r[T_CR];a.cw+=r[T_CW];
+    if(r[D_SESS]>=0)a.sess.add(r[D_SESS]);
+    const when=CUBE.days[r[D_DAY]]+" "+String(r[D_HOUR]).padStart(2,"0")+":00";
+    if(when>a.last)a.last=when;
+  }
+  const isolated=F.proj.size<nProj;
+  const all=CUBE.projects.map((p,i)=>({i,path:proj(p),...agg[i],sess:agg[i].sess.size}))
+    .filter(x=>x.tok>0||(isolated&&F.proj.has(x.i)));
+  $("attrKind").textContent="workspace";
+  if(!all.length){
+    $("attrNote").textContent="no workspaces in range";
+    $("attrBars").innerHTML=`<div class="empty">No workspaces match the current filters.</div>`;
+    return;
+  }
+  $("attrNote").textContent=`${all.length} workspace${all.length===1?"":"s"} \u00b7 every directory, not just the top ten`;
+  const keyFn={workspace:x=>x.path,recent:x=>x.last,tokens:x=>x.tok,
+               calls:x=>x.calls,sessions:x=>x.sess,
+               reuse:x=>x.cw?x.cr/x.cw:0}[wsSort.key];
+  all.sort((a,b)=>{const x=keyFn(a),y=keyFn(b);return (x>y?1:x<y?-1:0)*wsSort.dir;});
+  const maxTok=Math.max(1,...all.map(x=>x.tok));
+  const arrow=k=>wsSort.key===k?(wsSort.dir<0?" \u25be":" \u25b4"):"";
+  const th=(k,label,cls)=>`<th data-wsort="${k}" class="sortable ${cls||""}${wsSort.key===k?" active":""}">${label}${arrow(k)}</th>`;
+  const rows=all.map(x=>{
+    const on=isolated&&F.proj.has(x.i), w=Math.max(2,x.tok/maxTok*100);
+    return `<tr class="${on?"focused":""}"><td class="sess-dir" title="${x.path}">${x.path}</td>`+
+      `<td class="sess-when">${x.last||"\u2014"}</td>`+
+      `<td class="sess-tok"><span class="track"><i style="width:${w}%"></i></span>`+
+      `<span class="tv">${fmt(x.tok)}</span></td>`+
+      `<td class="num">${x.calls.toLocaleString()}</td>`+
+      `<td class="num">${x.sess.toLocaleString()}</td>`+
+      `<td class="num">${reuseTxt(x.cr,x.cw)}</td>`+
+      `<td class="rowacts"><button class="copybtn focusbtn${on?" on":""}" data-focus="proj" `+
+      `data-i="${x.i}" type="button" title="Filter every panel to this workspace">`+
+      `${on?"focused":"focus"}</button>`+
+      `<button class="copybtn" data-id="${x.path}" type="button" `+
+      `title="Copy this path">copy</button></td></tr>`;
+  }).join("");
+  $("attrBars").innerHTML=`<div class="sesswrap"><table class="sesstable">`+
+    `<thead><tr>${th("workspace","Workspace")}${th("recent","Last used")}`+
+    `${th("tokens","Tokens")}${th("calls","Calls","r")}${th("sessions","Sessions","r")}`+
+    `${th("reuse","Reuse","r")}<th></th></tr></thead>`+
+    `<tbody>${rows}</tbody></table></div>`+
+    `<p class="sess-hint"><b>focus</b> filters every panel to a workspace &mdash; focus several to compare them. `+
+    `This is the same filter as the bars in <b>Where the tokens go</b>, which show only the top ten. `+
+    `<b>Reuse</b> is how many times each cached token was re-read. Sort by any header.</p>`;
+}
+
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    try{ const ta=document.createElement("textarea"); ta.value=t;
+      ta.style.position="fixed"; ta.style.opacity="0"; document.body.appendChild(ta);
+      ta.select(); const ok=document.execCommand("copy"); ta.remove(); return ok;
+    }catch(e2){ return false; }
+  }
+}
+
+$("attrBars").addEventListener("click",async e=>{
+  const th=e.target.closest("th[data-sort]");
+  if(th){ const k=th.dataset.sort;
+    if(sessSort.key===k) sessSort.dir*=-1;
+    else sessSort={key:k,dir:k==="workspace"?1:-1};  // A-Z for text; high->low for the rest
+    drawSessions(); return; }
+  const wh=e.target.closest("th[data-wsort]");
+  if(wh){ const k=wh.dataset.wsort;
+    if(wsSort.key===k) wsSort.dir*=-1;
+    else wsSort={key:k,dir:k==="workspace"?1:-1};
+    drawWorkspaces(); return; }
+  // Must come before the .copybtn branch -- the focus button carries that class
+  // for styling, so testing for copy first would swallow every focus click.
+  const fb=e.target.closest("button[data-focus]");
+  if(fb){ const kind=fb.dataset.focus, i=+fb.dataset.i;
+    if(kind==="sess"){
+      // Empty means "no filter" for sessions, so this is a plain toggle rather
+      // than DL.toggleFocus's full-set-means-unfiltered rule.
+      if(F.sess.has(i))F.sess.delete(i); else F.sess.add(i);
+    } else { F.proj=DL.toggleFocus(F.proj,i,nProj); }
+    recompute(); return; }
+  const btn=e.target.closest(".copybtn");
+  if(btn){ const ok=await copyText(btn.dataset.id);
+    const prev=btn.textContent; btn.textContent=ok?"copied":"failed";
+    btn.classList.add("copied"); setTimeout(()=>{btn.textContent=prev;btn.classList.remove("copied");},1200); }
+});
+
+$("segAttr").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  [...e.currentTarget.children].forEach(c=>c.classList.toggle("on",c===b));
+  attrKind=b.dataset.v; drawAttr(attrKind);});
+drawAttr(attrKind); drawDeleg();
+
+/* delegation */
+function drawDeleg(){
+  const d=X.delegation;
+  const rows=(d.rows||[]).filter(r=>
+    inDay(CUBE.days[r[G_DAY]])&&F.proj.has(r[G_PROJ])&&passSess(r[G_SESS]));
+  // Re-summed from the rows, so tokens AND calls are exact under any filter.
+  let mt=0,st=0,mc=0,sc=0;
+  const byDay={};
+  for(const r of rows){
+    mt+=r[G_MAIN_TOK];st+=r[G_SUB_TOK];mc+=r[G_MAIN_CA];sc+=r[G_SUB_CA];
+    const k=CUBE.days[r[G_DAY]];
+    const a=byDay[k]||(byDay[k]=[0,0]);
+    a[0]+=r[G_MAIN_TOK];a[1]+=r[G_SUB_TOK];
+  }
+  const days=Object.keys(byDay).sort(), n=days.length;
+  const tot=mt+st, subPct=tot?st/tot*100:0;
+  $("delegLine").textContent=`${fmt(st)} of ${fmt(tot)} tokens (${subPct.toFixed(1)}%) via subagents, `+
+    `across ${sc.toLocaleString()} of ${(mc+sc).toLocaleString()} calls.`;
+  $("delegBar").innerHTML=`<div class="delegsplit">`+
+    `<div style="width:${100-subPct}%;background:var(--m-opus)">main ${(100-subPct).toFixed(0)}%</div>`+
+    `<div style="width:${subPct}%;background:var(--accent);min-width:42px">sub ${subPct.toFixed(1)}%</div></div>`;
+  if(!n){$("delegTrend").innerHTML=`<div class="empty">No days in range.</div>`;return;}
+  // daily trend (subagent share of tokens)
+  const max=Math.max(1,...days.map(k=>byDay[k][0]+byDay[k][1]));
+  const cw=Math.max(6,Math.min(26,600/n-4)),gap=Math.max(2,cw*0.24),padL=40,H=90,padT=6;
+  const W=padL+n*(cw+gap);
+  let s=`<svg viewBox="0 0 ${W} ${H+18}" style="max-width:${W}px" role="img" aria-label="Daily main vs subagent tokens">`;
+  days.forEach((k,i)=>{const x=padL+i*(cw+gap);const[mn,sb]=byDay[k];let acc=H;
+    [[mn,"var(--m-opus)"],[sb,"var(--accent)"]].forEach(([v,c])=>{if(!v)return;
+      const h=(H-padT)*v/max;acc-=h;
+      s+=`<rect x="${x}" y="${acc}" width="${cw}" height="${h}" rx="1.5" fill="${c}"><title>${k.slice(5)} \u00b7 ${c.includes("accent")?"sub":"main"} ${fmt(v)}</title></rect>`;});
+    if(i===0||k.slice(8)==="01")s+=`<text x="${x}" y="${H+12}" font-size="8.5" fill="var(--ink-faint)">${k.slice(5)}</text>`;});
+  s+=`</svg>`;$("delegTrend").innerHTML=s;
+}
+(function(){
+  const tr=X.truncations;
+  $("truncLine").innerHTML=`<b>Truncations:</b> ${tr.max_tokens} responses hit the output cap on Claude. `+
+    `(The ${tr.output_cap} output-cap errors in the logs were all the excluded local-model experiment.)`;
+})();
+
+/* ---- served mode: keep filters across auto-reloads, and refresh on interval ----
+   Selections are stored by VALUE, not index: a new or reordered model/project
+   would otherwise silently point a saved filter at the wrong item. "all" is a
+   sentinel so a newly-appeared item is included by default rather than excluded. */
+const _FKEY="cud_filters_v3";
+function _saveDim(set,arr){ return set.size>=arr.length ? "all" : [...set].map(i=>arr[i]); }
+function _restoreDim(saved,arr){
+  if(saved==="all"||!Array.isArray(saved)) return new Set(arr.map((_,i)=>i));
+  const want=new Set(saved), out=new Set();
+  arr.forEach((v,i)=>{ if(want.has(v)) out.add(i); });
+  return out.size ? out : new Set(arr.map((_,i)=>i));   // never leave it empty
+}
+function saveFilters(){try{localStorage.setItem(_FKEY,JSON.stringify({
+  gran:F.gran, from:F.from, to:F.to, preset:F.preset,
+  proj:_saveDim(F.proj,CUBE.projects),
+  model:_saveDim(F.model,CUBE.models),
+  eff:_saveDim(F.eff,CUBE.efforts),
+  acct:_saveDim(F.acct,ACCTS),
+  sess:[...F.sess].map(i=>CUBE.sessions[i])}));}catch(e){}}
+(function restoreFilters(){try{
+  const s=JSON.parse(localStorage.getItem(_FKEY)||"null"); if(!s)return;
+  if(s.gran)F.gran=s.gran;
+  const sp=DL.normSpan(s.from,s.to); F.from=sp.from; F.to=sp.to;
+  // A saved preset is re-derived rather than trusted: "7d" saved yesterday
+  // describes a different span today, and from/to are what actually filter.
+  F.preset=DL.matchPreset(F.from,F.to,today());
+  F.proj=_restoreDim(s.proj,CUBE.projects);
+  F.model=_restoreDim(s.model,CUBE.models);
+  F.eff=_restoreDim(s.eff,CUBE.efforts);
+  F.acct=_restoreDim(s.acct,ACCTS);
+  // By value, and silently dropping ids the rebuilt cube no longer has.
+  F.sess=new Set((Array.isArray(s.sess)?s.sess:[])
+    .map(id=>CUBE.sessions.indexOf(id)).filter(i=>i>=0));
+  [...$("segGran").children].forEach(c=>c.classList.toggle("on",c.dataset.v===F.gran));
+}catch(e){}})();
+paintRange();
+// Data is regenerated server-side every REFRESH_SECONDS; reload to pick it up,
+// but only while the tab is visible so a background tab doesn't churn.
+if(REFRESH_SECONDS>0)setInterval(()=>{ if(!document.hidden) location.reload(); }, REFRESH_SECONDS*1000);
+
+/* ---- live account limits ----
+   Fetched from the server rather than baked into the cube: the 5-hour window
+   moves far faster than the hourly rebuild. Silently hides itself when the
+   endpoint isn't there (i.e. the standalone file, opened without the server). */
+(function limits(){
+  const panel=$("limitsPanel"); if(!panel) return;
+  const DOW=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const clock=(ts,withDay)=>{
+    if(!ts) return null;
+    const d=new Date(ts*1000);
+    if(d.getTime()-Date.now()<=0) return null;      // already rolled over
+    const hh=String(d.getHours()).padStart(2,"0"), mm=String(d.getMinutes()).padStart(2,"0");
+    return withDay ? DOW[d.getDay()]+" "+hh+":"+mm : hh+":"+mm;
+  };
+  const tone=(v,lo,hi)=>v<lo?"good":v<=hi?"warn":"crit";
+  const age=s=>s<60?s+"s":s<3600?Math.floor(s/60)+"m":Math.floor(s/3600)+"h"+Math.floor(s%3600/60)+"m";
+  const bar=(k,v,cls,right)=>
+    `<div class="lim"><span class="lim-k">${k}</span>`+
+    `<div class="track"><div class="fill ${cls}" style="width:${Math.max(0,Math.min(100,v))}%"></div></div>`+
+    `<span class="lim-v ${cls}">${Math.round(v)}%</span>`+
+    `<span class="lim-r">${right}</span></div>`;
+
+  /* The numbers above say what the state is; this says what to do about it.
+     Rules, in order: an exhausted 5h window is the only thing that actually
+     blocks you right now -> name the account with room, and how long the wait
+     is. Otherwise judge the week against elapsed pace, which is the only way
+     "82% used" means anything: 82% on day 6 is fine, on day 2 it isn't. */
+  const dur=ms=>{const m=Math.max(0,Math.round(ms/60000));
+    return m<60?m+"m":Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m";};
+  function renderVerdict(accts){
+    const el=$("limitsVerdict"); if(!el) return;
+    const live=accts.filter(a=>a.status!=="auth");
+    if(!live.length){el.hidden=true;return;}
+    const info=live.map(a=>{
+      const f=a.five_hour||{}, s=a.seven_day||{};
+      let pace=null;
+      if(s.resets_at){const P=7*24*3600e3,left=s.resets_at*1000-Date.now();
+        pace=Math.max(0,Math.min(100,((P-left)/P)*100));}
+      return {key:a.key||"?",fv:f.utilization??0,sv:s.utilization??0,
+              fReset:f.resets_at?f.resets_at*1000-Date.now():null,pace};
+    });
+    const blocked=info.filter(a=>a.fv>=99), free=info.filter(a=>a.fv<99);
+    let cls="good",ico="\u25cf",msg;
+    if(blocked.length&&free.length){
+      const b=blocked[0],g=free.sort((x,y)=>x.fv-y.fv)[0];
+      cls="crit";ico="\u25b2";
+      msg=`Account <b>${b.key}</b> is out of its 5-hour window`+
+          (b.fReset?` for another <span class="mono">${dur(b.fReset)}</span>`:"")+
+          ` \u2014 use account <b>${g.key}</b>, which is at <span class="mono">${Math.round(g.fv)}%</span>.`;
+    }else if(blocked.length&&!free.length){
+      const b=blocked.sort((x,y)=>(x.fReset??1e15)-(y.fReset??1e15))[0];
+      cls="crit";ico="\u25b2";
+      msg=blocked.length>1
+        ? `Every account is out of its 5-hour window. The first one back is <b>${b.key}</b>`+(b.fReset?` in <span class="mono">${dur(b.fReset)}</span>`:"")+`.`
+        : `Out of 5-hour quota`+(b.fReset?` \u2014 back in <span class="mono">${dur(b.fReset)}</span>`:"")+`.`;
+    }else{
+      // nothing is blocking: is the week's burn rate sustainable?
+      const worst=info.slice().sort((x,y)=>(y.sv-(y.pace??0))-(x.sv-(x.pace??0)))[0];
+      const over=worst.pace!=null?worst.sv-worst.pace:null;
+      const many=info.length>1?` (account <b>${worst.key}</b>)`:"";
+      if(over==null){cls="good";msg=`Nothing is blocking you right now.`;}
+      else if(over>12){cls="crit";ico="\u25b2";
+        msg=`Weekly burn is <b>${Math.round(over)} points ahead of pace</b>${many} \u2014 <span class="mono">${Math.round(worst.sv)}%</span> spent with <span class="mono">${Math.round(100-worst.pace)}%</span> of the week left. Ease off or you'll hit the wall early.`;}
+      else if(over>0){cls="warn";
+        msg=`Slightly ahead of pace${many}: <span class="mono">${Math.round(worst.sv)}%</span> spent, <span class="mono">${Math.round(100-worst.pace)}%</span> of the week to go.`;}
+      else{cls="good";
+        msg=`Comfortably within pace${many}: <span class="mono">${Math.round(worst.sv)}%</span> spent, <span class="mono">${Math.round(100-worst.pace)}%</span> of the week to go.`;}
+    }
+    el.className="verdict "+cls;
+    el.innerHTML=`<span class="ico">${ico}</span><span>${msg}</span>`;
+    el.hidden=false;
+  }
+
+  async function tick(){
+    let data;
+    try{
+      const r=await fetch("limits.json",{cache:"no-store"});
+      if(!r.ok) throw new Error(r.status);
+      data=await r.json();
+    }catch(e){ panel.hidden=true; return; }
+
+    const accts=(data.accounts||[]).filter(Boolean);
+    if(!accts.length){ panel.hidden=true; return; }
+    panel.hidden=false;
+
+    $("limitsBody").innerHTML=accts.map(a=>{
+      const head=`<div class="lim-key">${a.key||"?"}</div>`;
+      if(a.status==="auth")
+        return `<div class="lim-acct">${head}<div class="lim-auth">not signed in</div></div>`;
+      const f=a.five_hour||{}, s=a.seven_day||{};
+      const fv=f.utilization==null?0:f.utilization, sv=s.utilization==null?0:s.utilization;
+      // 5h reset turns green inside the last hour - the wait is nearly over.
+      const ft=clock(f.resets_at,false), st=clock(s.resets_at,true);
+      const soon=f.resets_at && (f.resets_at*1000-Date.now())<3600e3;
+      const fRight=ft?`resets <span class="${soon?"soon":""}">${ft}</span>`:"resets --:--";
+      // Weekly is judged against pace: 60% is fine on day 6, alarming on day 1.
+      let pace=null;
+      if(s.resets_at){ const P=7*24*3600e3, left=s.resets_at*1000-Date.now();
+        pace=Math.max(0,Math.min(100,((P-left)/P)*100)); }
+      const sRight=(pace==null?"":`pace ${Math.round(pace)}% \u00b7 `)+
+        (st?`resets ${st}`:"resets --- --:--");
+      const sCls=(pace!=null&&sv>pace)?"crit":tone(sv,30,75);
+      return `<div class="lim-acct">${head}<div class="lim-bars">`+
+        bar("5h",fv,tone(fv,30,75),fRight)+bar("7d",sv,sCls,sRight)+`</div></div>`;
+    }).join("");
+
+    renderVerdict(accts);
+
+    const newest=Math.max(...accts.map(a=>a.fetched_at||0));
+    $("limitsAge").textContent=newest?("updated "+age(Math.max(0,(data.now||0)-newest))+" ago"):"";
+  }
+  tick();
+  setInterval(tick,60000);
+})();
+
+/* ---- collapsible panels ----
+   Each panel's content is wrapped so it can animate to zero height; the
+   heading becomes the toggle. Collapsed state is keyed by heading text (stable
+   across rebuilds) and persisted, so it survives the periodic auto-reload. */
+(function collapsibles(){
+  const KEY="cud_collapsed_v1";
+  let saved=[]; try{saved=JSON.parse(localStorage.getItem(KEY)||"[]");}catch(e){}
+  const allPanels=()=>document.querySelectorAll(".panel");
+  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(
+    [...document.querySelectorAll(".panel.collapsed")].map(p=>p.dataset.k)));}catch(e){}};
+  const setBtn=()=>{const b=$("toggleAll");if(!b)return;
+    b.textContent=document.querySelector(".panel:not(.collapsed)")?"Collapse all":"Expand all";};
+
+  allPanels().forEach(p=>{
+    const h=p.querySelector("h2"); if(!h||p.querySelector(".pbody"))return;
+    const note=h.querySelector(".clickable-note");
+    const title=h.textContent.replace(note?note.textContent:"","").trim();
+    p.dataset.k=title.toLowerCase().replace(/[^a-z0-9]+/g,"-").slice(0,40);
+    const wrap=document.createElement("div"); wrap.className="pbody";
+    const inner=document.createElement("div"); inner.className="pinner";
+    while(h.nextSibling) inner.appendChild(h.nextSibling);
+    wrap.appendChild(inner); p.appendChild(wrap);
+    h.setAttribute("role","button"); h.setAttribute("tabindex","0");
+    h.title="Click to collapse or expand";
+    const set=c=>{p.classList.toggle("collapsed",c);h.setAttribute("aria-expanded",String(!c));};
+    set(saved.includes(p.dataset.k));
+    const toggle=()=>{set(!p.classList.contains("collapsed"));save();setBtn();};
+    h.addEventListener("click",toggle);
+    h.addEventListener("keydown",e=>{
+      if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle();}});
+  });
+
+  const btn=$("toggleAll");
+  if(btn)btn.addEventListener("click",()=>{
+    const collapse=!!document.querySelector(".panel:not(.collapsed)");
+    allPanels().forEach(p=>{
+      p.classList.toggle("collapsed",collapse);
+      const h=p.querySelector("h2"); if(h)h.setAttribute("aria-expanded",String(!collapse));
+    });
+    save(); setBtn();
+  });
+  setBtn();
+})();
+
+/* scroll-reveal for panels (respects reduced-motion via CSS) */
+(function reveal(){
+  const els=document.querySelectorAll(".panel,.section-break");
+  if(!("IntersectionObserver" in window)){els.forEach(e=>e.classList.add("in"));return;}
+  const io=new IntersectionObserver((ents)=>ents.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target);}
+  }),{rootMargin:"0px 0px -8% 0px",threshold:.06});
+  els.forEach(e=>io.observe(e));
+})();
+
+(function(){
+  const el=$("acctCaveat"); if(!el)return;
+  el.innerHTML=SPLIT
+    ? `<b>Split by account.</b> Each account writes to its own transcripts directory, so every figure here is attributed to the account that produced it &mdash; measured, not inferred. Tooling attribution is still combined.`
+    : `<b>Combined across accounts.</b> Any additional account shares one config directory, so usage interleaves in a single transcript stream with no per-account marker &mdash; every figure is the total, and per-account attribution isn't possible. Give each account its own <code>CLAUDE_CONFIG_DIR</code> to split them; see <i>Using more than one account</i>.`;
+})();
+recompute();
+(function(){let s="now";try{s=localStorage.getItem(_SKEY)||"now";}catch(e){}showSection(s);})();
+</script>

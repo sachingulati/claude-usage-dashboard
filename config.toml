@@ -1,0 +1,51 @@
+# Claude Usage Dashboard — configuration
+# Edit these, then restart the server (or the next refresh cycle picks most of them up).
+
+# How often to regenerate the stats, in minutes. The dashboard page also
+# reloads itself on this interval so an open tab stays current.
+refresh_minutes = 60
+
+# Local web server. Bound to 127.0.0.1 only (never exposed to the network).
+port = 8787
+
+# Open the dashboard in your browser when the server starts.
+open_browser = true
+
+# Your timezone, used to bucket days and hours. IST = 5.5.
+tz_offset_hours = 5.5
+tz_label = "Asia/Kolkata (UTC+5:30)"
+
+# Where Claude Code stores its transcripts. Leave this blank: with `accounts`
+# set it reads each account's own <dir>/projects, and with none it falls back to
+# ~/.claude/projects. Set it only to override that -- a single path, or a list
+# to read several. An explicit value here wins over `accounts`.
+#
+#   transcripts_dir = "D:/claude/projects"
+#   transcripts_dir = ["~/.claude/projects", "~/.claude-work/projects"]
+transcripts_dir = ""
+
+# Accounts -- drives the live quota panel, and per-account usage where possible.
+#
+# Leave this empty and the default login (~/.claude) is detected automatically,
+# which is what you want on a stock install. Add entries only if you run more
+# than one Claude account. `dir` is that account's config/credentials folder.
+#
+#   accounts = [
+#     { label = "personal", dir = "~/.claude" },
+#     { label = "work",     dir = "~/.claude-work" },
+#   ]
+#
+# Quota is always per account. Whether *usage* can also be split depends on how
+# the accounts are separated:
+#
+#   * Separate config dirs (CLAUDE_CONFIG_DIR per account) -- each has its own
+#     <dir>/projects, so usage is attributed per account and a "By account"
+#     panel appears. Add a `transcripts = "..."` key if a folder sits elsewhere.
+#   * One shared config dir, differing only by credential
+#     (CLAUDE_SECURESTORAGE_CONFIG_DIR) -- every account writes to the same
+#     transcript folder with no per-account marker, so usage is combined. That
+#     is a property of the data, not a limitation of this tool.
+#
+# Machine-specific entries belong in config.local.toml (gitignored), which is
+# merged over this file, so the repo itself stays portable.
+accounts = []
