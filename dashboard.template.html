@@ -319,6 +319,10 @@
   .sesstable tbody tr:last-child td{border-bottom:none;}
   .sess-when{color:var(--ink);white-space:nowrap;}
   .sess-dir{color:var(--ink-soft);max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sess-dir>span{display:block;max-width:230px;overflow:hidden;text-overflow:ellipsis;}
+  .sess-title{color:var(--ink);}
+  .sess-title.fb{color:var(--ink-soft);font-style:italic;}
+  .sess-ws{color:var(--ink-faint);font-size:10.5px;margin-top:2px;}
   td.sess-tok{white-space:nowrap;}
   .sess-tok .track{display:inline-block;vertical-align:middle;width:80px;height:8px;overflow:hidden;
     background:var(--bg-2);border-radius:2px;}
@@ -814,7 +818,23 @@ const mGrad=k=>_GRAD[k]||"url(#g-accent)";
 // HOME_SLUG is this machine's home in that same encoding, injected at build time,
 // so the shortening works for whoever is running it rather than one hardcoded user.
 const HOME_SLUG=/*__HOME__*/"";
-const proj=n=>{let s=n;
+// That encoding is lossy (C:\my-app and C:\my\app share a name), so the build
+// resolves each folder to its real path where it can; the slug decoding below
+// is only the fallback for one it could not.
+const HOME=String(CUBE.home||"").replace(/\/+$/,"");
+const PPATH=new Map(CUBE.projects.map((p,i)=>[p,(CUBE.project_paths||[])[i]||""]));
+const proj=n=>{const p=PPATH.get(n);
+  if(p){
+    const h=HOME.toLowerCase(), l=p.toLowerCase();   // Windows paths: case-blind
+    if(h){
+      if(l===h) return "~";
+      if(l===h+"/projects") return "~/projects";
+      if(l.startsWith(h+"/projects/")) return p.slice(h.length+"/projects/".length);
+      if(l.startsWith(h+"/")) return "~/"+p.slice(h.length+1);
+    }
+    return p;
+  }
+  let s=n;
   if(HOME_SLUG){
     if(s===HOME_SLUG) s="~";
     else if(s===HOME_SLUG+"-projects") s="~/projects";
@@ -1501,7 +1521,7 @@ function drawSessions(){
   }
   const all=CUBE.sessions.map((id,i)=>{
     const m=meta.get(id);
-    return {i,id,last:(m&&m[3])||"",dir:(m&&m[4])||"",...agg[i]};
+    return {i,id,last:(m&&m[3])||"",dir:(m&&m[4])||"",title:(m&&m[6])||"",fb:!!(m&&m[7]),...agg[i]};
   }).filter(x=>x.tok>0);
   $("attrKind").textContent="session";
   if(!all.length){
@@ -1521,7 +1541,11 @@ function drawSessions(){
   const rows=all.map(x=>{
     const when=x.last.replace("T"," "), w=Math.max(2,x.tok/maxTok*100), on=sessOn(x.i);
     return `<tr class="${on?"focused":""}"><td class="sess-when">${when||"\u2014"}</td>`+
-      `<td class="sess-dir" title="${proj(x.dir)}">${proj(x.dir)}</td>`+
+      // Title over workspace: Claude Code's own title (or the user's /rename),
+      // else the first prompt, set apart since nothing summarised it.
+      `<td class="sess-dir"><span class="sess-title${x.fb?" fb":""}" title="${esc(x.title)}`+
+      `${x.fb?" (first prompt \u2014 no title recorded)":""}">${esc(x.title)||"\u2014"}</span>`+
+      `<span class="sess-ws" title="${esc(proj(x.dir))}">${esc(proj(x.dir))}</span></td>`+
       `<td class="sess-tok"><span class="track"><i style="width:${w}%"></i></span>`+
       `<span class="tv">${fmt(x.tok)}</span></td>`+
       `<td class="num">${x.calls.toLocaleString()}</td>`+
@@ -1534,7 +1558,7 @@ function drawSessions(){
       `title="Copy session id (claude --resume ${x.id})">copy</button></td></tr>`;
   }).join("");
   $("attrBars").innerHTML=`<div class="sesswrap"><table class="sesstable">`+
-    `<thead><tr>${th("recent","Last used")}${th("workspace","Workspace")}`+
+    `<thead><tr>${th("recent","Last used")}${th("workspace","Summary / workspace")}`+
     `${th("tokens","Tokens")}${th("calls","Calls","r")}${th("reuse","Reuse","r")}`+
     `<th>Session</th><th></th></tr></thead>`+
     `<tbody>${rows}</tbody></table></div>`+

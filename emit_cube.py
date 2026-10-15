@@ -33,20 +33,125 @@ def is_claude(m):
     return m.startswith("claude-")
 
 
+PROMPT_WORDS = 6   # a fallback title is the first prompt, cut to this many words
+
+
+def prompt_text(d):
+    """A session's typed prompt as a short label, or "" for anything else.
+
+    Meta lines, subagent prompts and tool results are not something the user
+    typed. A slash command reads as the command and its arguments rather than
+    the XML wrapper Claude Code stores it in."""
+    if d.get("isMeta") or d.get("isSidechain"):
+        return ""
+    c = (d.get("message") or {}).get("content")
+    if isinstance(c, list):
+        c = " ".join(b.get("text", "") for b in c
+                     if isinstance(b, dict) and b.get("type") == "text")
+    if not isinstance(c, str):
+        return ""
+    cmd = re.search(r"<command-name>(.*?)</command-name>", c, re.S)
+    if cmd:
+        args = re.search(r"<command-args>(.*?)</command-args>", c, re.S)
+        c = cmd.group(1) + " " + (args.group(1) if args else "")
+    elif c.lstrip().startswith("<"):
+        return ""      # local-command output, system reminders and the like
+    words = c.split()
+    if len(words) > PROMPT_WORDS:
+        return " ".join(words[:PROMPT_WORDS]) + "\u2026"
+    return " ".join(words)
+
+
+def slugify(path):
+    """Claude Code's transcript-folder name for a cwd: every non-alphanumeric
+    character becomes '-', so C:\\my-app and C:\\my\\app share a name."""
+    return re.sub(r"[^A-Za-z0-9]", "-", path)
+
+
+def resolve_folder(name, seen):
+    """The real path behind a transcript folder name, '/'-separated, or "".
+
+    The name alone is ambiguous, so this looks for evidence: first a cwd the
+    folder's own records carry that encodes to exactly this name (the common
+    case; a session that cd'd elsewhere doesn't count). A folder that has moved
+    since its sessions ran has no such cwd, so the name is then walked against
+    the disk, one directory at a time, trying the names that exist there plus
+    the path components the records mention. A tail that no longer exists is
+    kept as the old '-' -> '/' reading rather than dropped."""
+    for cwd, _n in seen.most_common():
+        if slugify(cwd) == name:
+            return cwd.replace("\\", "/")
+    m = re.match(r"([A-Za-z])--", name)
+    if m:
+        start, rest = m.group(1).upper() + ":/", name[3:]
+    elif name.startswith("-"):
+        start, rest = "/", name[1:]
+    else:
+        return ""
+    vocab = {p for cwd in seen for p in re.split(r"[\\/]", cwd) if p}
+
+    def walk(path, rest):
+        if not rest:
+            return path
+        try:
+            here = set(os.listdir(path))
+        except OSError:
+            here = set()
+        cands = [c for c in here | vocab
+                 if slugify(c) == rest or rest.startswith(slugify(c) + "-")]
+        for c in sorted(cands, key=len, reverse=True):
+            got = walk(os.path.join(path, c), rest[len(slugify(c)) + 1:])
+            if got:
+                return got
+        return None
+
+    # Resolve as much of the path as possible: the longest prefix whose every
+    # step exists, then the rest read the old way.
+    path = walk(start, rest)
+    if path:
+        return path.replace("\\", "/")
+    parts = rest.split("-")
+    for k in range(len(parts) - 1, 0, -1):
+        path = walk(start, "-".join(parts[:k]))
+        if path:
+            return path.replace("\\", "/").rstrip("/") + "/" + "/".join(x for x in parts[k:] if x)
+    return ""
+
+
 best, limits_raw = {}, []
 output_caps = 0                          # responses that blew the output-token cap
 _files = [(ai, root, f)
           for ai, (_lbl, root) in enumerate(ROOTS)
           for f in glob.glob(os.path.join(root, "**", "*.jsonl"), recursive=True)]
+cwds = collections.defaultdict(collections.Counter)   # folder -> cwd -> records
+titles, prompts = {}, {}                               # session -> (kind, text)
 for acct_i, _root, f in _files:
     acct_i = acct_i if SPLIT_BY_ACCOUNT else 0
     d0 = os.path.relpath(f, _root).split(os.sep)[0]
+    need_prompt = True     # only the first real prompt of a file is wanted
     for line in open(f, encoding="utf-8", errors="replace"):
-        if '"usage"' not in line and "isApiErrorMessage" not in line:
+        is_title = '-title"' in line
+        want_prompt = need_prompt and '"user"' in line
+        if not (is_title or want_prompt) and '"usage"' not in line \
+                and "isApiErrorMessage" not in line:
             continue
         try:
             d = json.loads(line)
         except json.JSONDecodeError:
+            continue
+        if is_title and d.get("type") in ("ai-title", "custom-title"):
+            # Claude Code rewrites its ai-title as a session goes on, so the
+            # latest wins; a title the user set with /rename beats any of them.
+            sid, custom = d.get("sessionId"), d["type"] == "custom-title"
+            text = d.get("customTitle" if custom else "aiTitle")
+            if sid and text and (custom or titles.get(sid, ("",))[0] != "custom"):
+                titles[sid] = ("custom" if custom else "ai", text)
+            continue
+        if want_prompt and d.get("type") == "user":
+            text = prompt_text(d)
+            if text:
+                need_prompt = False
+                prompts.setdefault(d.get("sessionId"), text)
             continue
         t = d.get("timestamp")
         if not t:
@@ -61,6 +166,8 @@ for acct_i, _root, f in _files:
             total = inp + out + cw + cr
             if total == 0:
                 continue
+            if d.get("cwd"):
+                cwds[d0][d["cwd"]] += 1
             content = m.get("content")
             tool_names = [b.get("name") for b in content
                           if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name")] \
@@ -307,11 +414,19 @@ for r in recs:
         s["last_ts"] = r["ts"]
 # Full session id so the front end can offer a copy-to-resume; sorted most
 # recent first as a sensible default, though the page re-sorts on demand.
-# Columns: [id, tokens, calls, last-used (ISO minutes), directory, account]
+# Columns: [id, tokens, calls, last-used (ISO minutes), directory, account,
+#           title, isFallback]. The title is Claude Code's own (or the user's
+# /rename); an untitled session falls back to its first prompt, flagged 1.
+def sess_title(sid):
+    if sid in titles:
+        return [titles[sid][1], 0]
+    return [prompts[sid], 1] if sid in prompts else ["", 0]
+
+
 sess_list = [[sid, v["tok"], v["calls"],
               v["last_ts"].astimezone(IST).strftime("%Y-%m-%dT%H:%M"),
               (v["dirs"].most_common(1)[0][0] if v["dirs"] else ""),
-              v["acct"] or ""]
+              v["acct"] or "", *sess_title(sid)]
              for sid, v in sorted(sess.items(),
                                   key=lambda kv: kv[1]["last_ts"] or datetime.datetime.min.replace(tzinfo=UTC),
                                   reverse=True)
@@ -339,6 +454,11 @@ out = dict(
     tz=_TZ_LABEL,
     span=[days[0], days[-1]],
     days=days, projects=projects, models=models, efforts=efforts, sessions=sessions,
+    # The real path behind each project's folder name, "/"-separated, or "" when
+    # nothing resolves it (the page then decodes the name as before). Projects
+    # stay keyed by folder name; this is for display only.
+    project_paths=[resolve_folder(p, cwds[p]) for p in projects],
+    home=os.path.expanduser("~").replace("\\", "/"),
     # Present only when each account has its own transcripts directory, so the
     # split is measured rather than inferred. Empty means "combined".
     accounts=ACCOUNTS,
@@ -348,7 +468,10 @@ out = dict(
     switches=switches,
     extras=extras,
 )
-json.dump(out, open(OUT, "w"), separators=(",", ":"))
+# The cube is pasted into a <script> block, and titles and prompts are free
+# text: escape "</" so one mentioning </script> can't end the block early.
+with open(OUT, "w") as fh:
+    fh.write(json.dumps(out, separators=(",", ":")).replace("</", "<\/"))
 sz = os.path.getsize(OUT)
 print("records:", len(recs), " fact rows:", len(facts), " switches:", len(switches))
 print("dims: days", len(days), "projects", len(projects), "models", len(models))

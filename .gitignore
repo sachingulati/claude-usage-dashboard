@@ -12,3 +12,4 @@ config.local.toml
 
 # local working notes (plans/specs), kept out of the repo
 docs/superpowers/
+.playwright-mcp/
